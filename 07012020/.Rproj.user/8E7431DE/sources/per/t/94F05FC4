@@ -1,0 +1,22 @@
+{
+    "collab_server" : "",
+    "contents" : "",
+    "created" : 1581533933975.000,
+    "dirty" : false,
+    "encoding" : "UTF-8",
+    "folds" : "",
+    "hash" : "3121743862",
+    "id" : "94F05FC4",
+    "lastKnownWriteTime" : 1578904982,
+    "last_content_update" : 1578904982,
+    "path" : "~/Desktop/R/07012020/gg.partition.tree.R",
+    "project_path" : "gg.partition.tree.R",
+    "properties" : {
+        "cursorPosition" : "102,1",
+        "scrollLine" : "84"
+    },
+    "relative_order" : 2,
+    "source_on_save" : false,
+    "source_window" : "",
+    "type" : "r_source"
+}

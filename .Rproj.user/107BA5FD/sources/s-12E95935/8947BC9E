@@ -1,0 +1,23 @@
+{
+    "collab_server" : "",
+    "contents" : "",
+    "created" : 1589408077194.000,
+    "dirty" : false,
+    "encoding" : "UTF-8",
+    "folds" : "",
+    "hash" : "3504998177",
+    "id" : "8947BC9E",
+    "lastKnownWriteTime" : 1587980905,
+    "last_content_update" : 1587980905,
+    "path" : "~/Desktop/git.repo/MiceProject/test.Rmd",
+    "project_path" : "test.Rmd",
+    "properties" : {
+    },
+    "read_only" : false,
+    "read_only_alternatives" : [
+    ],
+    "relative_order" : 1,
+    "source_on_save" : false,
+    "source_window" : "",
+    "type" : "r_markdown"
+}

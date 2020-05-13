@@ -1,0 +1,702 @@
+#### MCB & HC, 15.05.19; 
+#### MCB & HC, 05.07.19;
+#### MCB & HC, 23.08.19
+#### MCB & HC, 08.10.19
+#### MCB & HC, 28.11.19
+
+#### libraries ####
+
+## install.packages('animation') do this only the first time
+
+library(tidyverse)
+library(lubridate)
+library(plyr)
+library(readxl) ### this worked
+library(plotly)
+library(gganimate)
+library(RColorBrewer)
+library(gifski)
+library(av) ### both gifski and av are renderers for animations
+library(animation)
+
+library( splancs) ### computes areas of a surface
+
+library(circular) ## to compute angular summaries, mean, variance, median...
+
+library(tree)
+library(wesanderson) ### for colour palettes
+
+library(randtests) ## for runs.test
+
+library(class) ## for knn
+
+library(klaR) ### for partition plots
+
+library(rpart.plot) ### for prettier trees
+library(plotmo)  ### for 3d plots?
+
+
+
+
+### get a plotly account! 
+Sys.setenv("plotly_username"="MarioCortinaBorja")
+Sys.setenv("plotly_api_key"="q7KXL3vJh8SKLyO12Nel")
+Sys.setenv("plotly_domain" = "http://mydomain.com")
+
+## API key for plotly = q7KXL3vJh8SKLyO12Nel
+plotly.API<-
+  plotly::signup(username="MarioCortinaBorja", 
+                 email='m.cortina@ucl.ac.uk', save = FALSE)
+
+#options(java.parameters = "-Xmx1024m") 
+## this sorts out Error: OutOfMemoryError (Java): GC overhead limit exceeded. (IT DIDN'T!!!)
+#library(XLConnect)
+
+
+#### functions ####
+### function read_excel_allsheets from
+### https://stackoverflow.com/questions/12945687/read-all-worksheets-in-an-excel-workbook-into-an-r-list-with-data-frames
+
+read_excel_allsheets <- function(filename, tibble = FALSE) {
+  # I prefer straight data.frames
+  # but if you like tidyverse tibbles (the default with read_excel)
+  # then just pass tibble = TRUE
+  sheets <- readxl::excel_sheets(filename)
+  x <- lapply(sheets, function(X) readxl::read_excel(filename, sheet = X))
+  if(!tibble) x <- lapply(x, as.data.frame)
+  names(x) <- sheets
+  x
+}
+
+
+radians.to.degrees<- function(theta) {(theta * 180) / (pi) }
+
+#### data ####
+### names of spreadsheets
+names.sheets<- c('WTUT292.2e', 'WTUT281.4c', 'WTUT279.5f', 'NPCUT293.2c', 'NPCUT293.2e', 'NPCUT310.1d',
+                 'NPCTG286.1g', 'NPCTG277.4c', 'NPCTG294.2c')
+
+
+test<- read_excel_allsheets("NPCTG.xlsx")
+for (i in 1:9) assign(names.sheets[i], test[[i]]) ### OK
+rm(test)
+
+for (i in 1:9) 
+{
+  aux<- get(names.sheets[i])
+  aux$Point<- as.factor(aux$Point)
+  id<- as.factor(substring(aux$ID, 1, gregexpr(pattern='RUN', aux$ID)[[1]][1] - 1) )
+  run<- as.factor(substring(aux$ID, gregexpr(pattern='RUN', aux$ID)[[1]][1], nchar(aux$ID)))
+  aux$Run<- run
+  aux$ID<- id
+  assign(names.sheets[i], aux)
+}
+rm(aux)
+
+for (i in 1:9) print(summary(get(names.sheets[i])))
+
+
+compute.angle<- function(mouse.name)
+{
+  ### computes the angle from Tail to Head coordinates
+  ### mouse.name is an element of names.sheets
+  df<- get(mouse.name) ### full data.frame
+  num.angles<- table(df$Point, df$Run)[1,]
+  angles.df<- data.frame(Run=NA, time=NA, theta=NA)
+  k0<-0
+  for (ind.run in levels( df$Run))
+  {
+    k0<-k0+1
+    b0<- ind.run==df$Run
+    df.aux<- df[b0,]
+    tail<- df.aux$Point=='Tail'
+    head<- df.aux$Point=='Head'
+    Xh<- df.aux$X[head]; Xt<- df.aux$X[tail]
+    Yh<- df.aux$Y[head]; Yt<- df.aux$Y[tail]
+    Hypotenuse<- sqrt((Xh - Xt)^2  + (Yh - Yt)^2)
+    sign.delta<- sign(Yh - Yt) 
+    Delta<- abs(Xh - Xt)  
+    theta<- sign.delta*radians.to.degrees(acos(Delta/Hypotenuse))
+    angles.df<- rbind(angles.df, data.frame(Run=as.factor(rep(ind.run, num.angles[k0])),
+                                            time=1:num.angles[k0],
+                                            theta=theta)
+    )
+  } ## iteration on ind.run
+  angles.df$Run<- as.factor(angles.df$Run)
+  invisible(angles.df[-1,]) ### assign this data.frame to the function
+} ## end of function
+
+## join angles to to original data.frame
+for(i in 1:9)
+{
+  print(i)
+  aux<- compute.angle(names.sheets[i]) ### generate angles
+  df<- get(names.sheets[i]) ### full data.frame
+  df$Angle<- rep(NA, dim(df)[1])
+  for (ind.run in levels(aux$Run))
+  {
+    print(ind.run)
+    i0<- aux$Run==ind.run
+    i1<- df$Run==ind.run
+    df$Angle[i1]<- rep(aux$theta[i0],3)
+  }### end iteration over Runs
+  assign(names.sheets[i], df)
+}### end iterations over files
+
+##### compute summaries for all mice ####
+
+
+max.t<- max.Y<- max.X<- max.Angle <- -1000
+min.t<- min.Y<- min.X<- min.Angle<-  1000
+
+
+for (i in names.sheets) 
+{
+  print( paste("mouse_",i,sep="") ,quote=FALSE)
+  mouse.data<- get(i)
+  
+  min.t<- ifelse(min(mouse.data$t, na.rm=TRUE) <= min.t, min(mouse.data$t, na.rm=TRUE),  min.t)
+  max.t<- ifelse(max(mouse.data$t, na.rm=TRUE) >= max.t, max(mouse.data$t, na.rm=TRUE),  max.t)
+  
+  min.X<- ifelse(min(mouse.data$X, na.rm=TRUE) <= min.X, min(mouse.data$X, na.rm=TRUE), min.X)
+  max.X<- ifelse(max(mouse.data$X, na.rm=TRUE) >= max.X, max(mouse.data$X, na.rm=TRUE), max.X)
+  
+  min.Y<- ifelse(min(mouse.data$Y, na.rm=TRUE) <= min.Y, min(mouse.data$Y, na.rm=TRUE), min.Y)
+  max.Y<- ifelse(max(mouse.data$Y, na.rm=TRUE) >= max.Y, max(mouse.data$Y, na.rm=TRUE), max.Y)
+  
+  min.Angle<- ifelse(min(mouse.data$Angle, na.rm=TRUE) <= min.Angle, min(mouse.data$Angle, na.rm=TRUE), min.Angle)
+  max.Angle<- ifelse(max(mouse.data$Angle, na.rm=TRUE) >= max.Angle, max(mouse.data$Angle, na.rm=TRUE), max.Angle)
+  
+}
+
+
+
+
+
+
+
+########################### plots ####
+
+
+plot.Y_vs_X<- function(mouse.name, Point)
+{
+  g1<-
+    get(mouse.name) %>% filter(Point==Point) %>%
+    ggplot(aes(X,Y)) +  geom_line(col='red') + theme_bw() + 
+    labs(x=expression(~italic(X)), y=expression(~italic(Y))) +
+    geom_hline(yintercept=0, linetype=2, size=1.25, col='gray') + 
+    ggtitle(mouse.name) + geom_smooth(col='black', size=1, se=FALSE) + 
+    NULL
+  g1A<- g1 + facet_wrap( ~Run, ncol=3)
+  g1A
+}
+
+plot.Y_vs_X(names.sheets[9], 'Tail')
+
+
+plot.Angle_vs_time<- function(mouse.name)
+{
+  g1<- 
+    get(mouse.name) %>% 
+    ggplot(aes(t, Angle)) +  
+    geom_line(col='red') + theme_bw() + 
+    labs(x=expression(~italic(time)), y=expression(~italic(~theta))) +
+    geom_hline(yintercept=0, linetype=2, size=1.25, col='gray') + 
+    ggtitle(paste(mouse.name, sep=' - ')) + 
+    geom_smooth(col='black', size=1, se=FALSE) + 
+    NULL
+  
+  g1A<- g1 + facet_wrap( ~Run, ncol=3)
+  g1A
+}
+
+plot.Angle_vs_time(names.sheets[3])
+
+plot.X_vs_Angle<- function(mouse.name, Point)
+{
+  g1<-
+    get(mouse.name) %>% filter(Point==Point) %>%
+    ggplot(aes(X, Angle)) +  geom_path(col='red') + theme_bw() + 
+    labs(x=expression(~italic(X)), y=expression(~italic(~theta))) +
+    geom_hline(yintercept=0, linetype=2, size=1.25, col='gray') + 
+    geom_vline(xintercept=0, linetype=2, size=1.25, col='gray') + 
+    ggtitle(paste(mouse.name, Point, sep=' - ')) + 
+    # geom_smooth(col='black', size=1, se=FALSE) +
+    NULL
+  g1A<- g1 + facet_wrap( ~Run, ncol=3)
+  g1A
+}
+
+plot.X_vs_Angle(names.sheets[5], 'Head')
+
+
+### summaries
+
+test<-  get(mouse.name) %>% filter(Point==point) %>% 
+        group_by(Run) %>%  summarise(min=min(Angle), max=max(Angle),
+                                 mean=mean(Angle), interval=max(t))
+
+plot.Y_vs_Angle<- function(mouse.name, point)
+{
+  
+  df1<- get(mouse.name) %>% filter(Point==point)
+  
+  df1.ss<- data.frame(Run='Run1', x=NA, y=NA)
+  for (i in unique( df1$Run))
+  {
+    b0<- i==df1$Run
+    df1.ss.aux<- data.frame(predict(smooth.spline(df1$t[b0], df1$Angle[b0])))
+    df1.ss.aux$Run<- i
+    df1.ss<- rbind(df1.ss, df1.ss.aux )
+  }
+  df1.ss<- df1.ss[-1,]
+  df1<- cbind(df1, df1.ss$y)
+  names(df1)[8] <- "smoothAngle"
+  g1<- ggplot(df1, aes(t, smoothAngle, color=Run), size=0.5) +  
+    geom_path(size=1.25) + theme_bw() + 
+    labs(x=expression(~italic(time)), y=expression(~italic(~theta))) +
+    geom_hline(yintercept=0, linetype=2, size=1.25, col='gray') + 
+    geom_vline(xintercept=0, linetype=2, size=1.25, col='gray') + 
+    ggtitle(paste(mouse.name, point, sep=' - ')) + 
+    NULL
+  g1<- g1 + geom_path(aes(t, smoothAngle)) +
+       NULL
+  g2<- g1 + facet_wrap( ~ Run) + #gganimate::transition_reveal(t) +
+       NULL
+  print(g2)
+}
+
+pdf(file='Angle_vs_Time_081019.pdf')
+for (i in 1:9)
+{
+  print(i)
+  plot.Y_vs_Angle(names.sheets[i], 'Head')
+}
+dev.off()
+
+
+
+###################
+
+g1<-
+  get(mouse.name) %>% filter(Point=='Head') %>%
+  ggplot(aes(t, Angle)) +  geom_line(col='red')  +
+  NULL
+
+
+g1 + facet_grid( ~ Run)
+
+anim1<- plot.Y_vs_Angle(names.sheets[9], 'Centre')
+
+magick::image_write(animate(anim1), path='first_plot.gif')
+
+plot(anim1)
+
+
+
+#### summary statistics ####
+all.mice$CircAngle<- circular(rad(all.mice$Angle), type='directions')
+
+all.mice.summary<-
+  all.mice %>% filter(Point=='Head') %>% 
+           group_by(ID, Run) %>%  
+                 summarise(min=min(Angle, na.rm=TRUE), max=max(Angle, na.rm=TRUE),
+                           mean=mean(Angle, na.rm=TRUE), stddev=sd(Angle, na.rm=TRUE),
+                           time.interval=max(t, na.rm=TRUE))
+
+test<- as.numeric(all.mice.summary$ID)
+test<- ifelse(test==1 | test==8 | test ==9, 3,
+              ifelse(test==2 | test==3 | test==4, 1, 2))
+              ### 3 = NPCT, 2 = NPCUT, 1=WT
+test<- as.factor(test )
+attr(test,'levels')<- c('WT','NPC-UT','NPC-T')
+all.mice.summary$Tx<- test
+rm(test)
+
+pdf(file='boxplots_081019.pdf')
+all.mice.summary %>% ggplot(aes(x=Tx, y=min)) + geom_boxplot()
+all.mice.summary %>% ggplot(aes(x=Tx, y=max)) + geom_boxplot()
+all.mice.summary %>% ggplot(aes(x=Tx, y=mean)) + geom_boxplot()
+all.mice.summary %>% ggplot(aes(x=Tx, y=stddev)) + geom_boxplot()
+all.mice.summary %>% ggplot(aes(x=Tx, y=time.interval)) + geom_boxplot()
+dev.off()
+
+col1<- wesanderson::wes_palette("Darjeeling1",3)
+
+all.mice.summary %>% ggplot(aes(y=max-min,x=Tx, fill=Tx)) + geom_boxplot() + 
+  scale_fill_manual(values=col1)
+
+kruskal.test(max-min ~ Tx, data=all.mice.summary)
+
+ID<- 'NPCTG277.4c'; run<-'RUN4'
+
+aux<- all.mice[all.mice$ID==ID & all.mice$Run==run, ]
+
+p1<-  ggplot(aux, aes(t, Angle)) + geom_line()  + 
+         geom_smooth(se=FALSE) + 
+         NULL
+
+p1
+
+
+
+################## animation plots ####
+
+
+for (j in c('Centre', 'Head','Tail'))
+  for (i in names.sheets) 
+  {
+    print( paste("mouse_",i,"_",j,".gif",sep="") ,quote=FALSE)
+    mouse.data<- get(i)
+    
+    p0<- mouse.data %>% filter(Point==j) %>%
+      ggplot(aes(Y, Angle, color=t)) + geom_line(size=1) + 
+      theme(panel.grid.major = element_blank(), 
+            panel.grid.minor = element_blank(), 
+            axis.line=element_line(colour='black')) +
+      labs(x=expression(~italic(Y)), y=expression(~italic(~theta))) +
+      scale_y_continuous(limits=c(-30,30), breaks=seq(-30, 30, by=5)) + 
+      scale_x_continuous(limits=c(-35,31), breaks=c(-30,-15,0,15,30)) + 
+      geom_hline(yintercept=0, linetype=2, size=1.25, col='gray') + 
+      geom_vline(xintercept=0, linetype=2, size=1.25, col='gray') + 
+      # theme(legend.position="none") + 
+      geom_point(size=2, color='black') + 
+      scale_colour_gradientn("time (s)", colours=rainbow(6))  + 
+      NULL
+    
+    
+    animation::ani.options(loop=1) ### set value of loop
+    
+    p1<- p0 + transition_reveal(t) + 
+      labs(title=paste(i,j,sep=' '), subtitle="Time {frame} of {nframes}") +
+      geom_label(aes(y=max.Angle,  x=0, 
+                     label=as.character(round(t,2)), hjust=1/2, vjust=1/2), 
+                 colour='black')+ 
+      facet_grid(~ Run) + 
+      NULL
+    
+    ##p2<- animate(p1, rewind=FALSE, nframes=100, fps=10, end_pause=10)
+    
+    p2<- animate(p1, nframes=100, fps=10, renderer=gifski_renderer(loop=FALSE))
+    
+    
+    gganimate::anim_save(filename=paste("mouse_",i,"_",j,".gif",sep=""),
+                         animation=p2, path=getwd())
+    
+  } ### end function
+
+
+################################### 23.08.19 ####
+
+### consolidate data from nine mice into a data.frame ####
+
+
+all.mice<- mouse.data[1,] ### initialises
+
+for (i in names.sheets) 
+{
+  print( paste("mouse_",i,sep="") ,quote=FALSE)
+  mouse.data<- get(i)
+  all.mice<- rbind( all.mice, mouse.data)
+}
+all.mice<- all.mice[-1,]
+
+
+#### summaries for all mice
+
+mouse.freq<- table( all.mice$ID)  
+mouse.type<- c('WT','WT','WT','NPCUT','NPCUT','NPCUT', 'NPCTG', 'NPCTG','NPCTG') 
+all.mice$Type<- rep( mouse.type, mouse.freq)
+
+
+### each run is about 45cm long
+
+### generate velocity.df
+
+length.catwalk<- 45
+
+velocity.df<-  all.mice %>% filter(Point=='Head') %>% 
+                            group_by(Type, ID, Run) %>% 
+                               summarise(Xstart=X[which(t==0)],
+                                         YStart=Y[which(t==0)],
+                                         Xend = X[which(t==max(t))],
+                                         Yend = Y[which(t==max(t))],
+                                         madY = median(abs(Y)),
+                                         t = max(t),
+                                         mean.angle = mean.circular(CircAngle, na.rm=TRUE),
+                                         var.angle = var.circular(CircAngle, na.rm=TRUE)
+                               )
+Test.vel <- all.mice %>% filter(Point=='Head') %>% 
+  group_by(Type, ID, Run) %>% 
+  summarise(Xstart=X[which(t==0)],
+            YStart=Y[which(t==0)],
+            Xend = X[which(t==max(t))],
+            Yend = Y[which(t==max(t))],
+            madY = median(abs(Y)),
+            t = max(t),
+            mean.angle = mean.circular(abs(CircAngle), na.rm=TRUE),
+            var.angle = var.circular(abs(CircAngle), na.rm=TRUE)
+  )
+Test.vel$Type <- factor( velocity.df$Type, levels=c('NPCUT', 'NPCTG', 'WT'))
+Test.vel$velocity<- with(velocity.df, abs(Xend - Xstart)/t)
+Test.vel$mean.angleNum<- as.numeric(unclass(Test.vel$mean.angle))
+Test.vel$var.angle <- as.numeric(unclass(Test.vel$var.angle))
+
+
+
+model.tr2<- tree( Type ~  mean.angleNum + velocity , data=Test.vel)
+plot(model.tr2); text(model.tr2)
+
+partition.tree(model.tr2, label='Type')
+with(Test.vel, points(  mean.angleNum, velocity, pch=19, cex=1.5, col=as.numeric(Type)))
+
+ggplot(Test.vel, aes( velocity,mean.angleNum, group=Type, color=Type)) +
+       geom_point(size=4) +
+       gg.partition.tree(model.tr2, 
+                         label='Type', color='black', size=9) +
+       geom_smooth(method='lm', se=FALSE, size=1.5) + 
+       theme_classic() +
+       theme(legend.position=c(0.75,0.75)) + 
+       NULL
+
+
+model.tr2a<- tree( Type ~  var.angle + velocity , data=Test.vel)
+plot(model.tr2a); text(model.tr2a)
+
+plot(prune.tree(model.tr2a))
+
+model.tr2a1<- prune.tree(model.tr2a, k=3) ### limit to 3 terminal nodes
+plot(model.tr2a1); text(model.tr2a1)
+
+
+partition.tree(model.tr2a, label='Type')
+with(Test.vel, points(  var.angle, velocity, pch=19, cex=1.5, col=as.numeric(Type)))
+
+ggplot(Test.vel, aes(  var.angle, velocity, group=Type, color=Type)) +
+  geom_point(size=4) +
+  gg.partition.tree(model.tr2a1, 
+                    label='Type', color='black', size=8) +
+  geom_smooth(method='lm', se=FALSE, size=1.5) + 
+  theme_classic() +
+  theme(legend.position=c(0.75,0.75)) + 
+  NULL
+
+
+velocity.df$Type <- factor( velocity.df$Type, levels=c('NPCUT', 'NPCTG', 'WT'))
+velocity.df$velocity<- with(velocity.df, abs(Xend - Xstart)/t)
+velocity.df$mean.angleNum<- as.numeric(unclass(velocity.df$mean.angle))
+### 07.01.20
+
+#### linear and quadratic discriminant analyis classifiers
+
+model.lda1<- klaR::partimat( Type ~ velocity + mean.angle, data=Test.vel, method='lda')
+## doesn't seem to work as well as the tree classifiers
+model.qda1<- klaR::partimat( Type ~ velocity + mean.angle, data=Test.vel, method='qda')
+## doesn't seem to work
+model.baes1<- klaR::partimat( Type ~ velocity + mean.angle, data=Test.vel, 
+                             method='naiveBayes')
+
+model.baes1<- klaR::partimat( Type ~ velocity + mean.angle, data=Test.vel, 
+                              method='sknn', kn=3)
+
+###  classifiers in 2d and 3d ####
+
+
+test.tree1<- rpart( Type ~ Yend + velocity  + mean.angle, data=Test.vel)
+rpart.plot::prp(test.tree1, extra=7) ### pretty tree
+
+plotmo(test.tree1, type='prob')
+
+model.tr1<- tree( Type ~ velocity + mean.angleNum, data=velocity.df)
+plot(model.tr1); text(model.tr1)
+
+partition.tree(model.tr1, label='Type')
+with(velocity.df, points( velocity, mean.angleNum, pch=19, cex=1.5, col=as.numeric(Type)))
+
+
+
+velocity.CircularAngle<- 
+  all.mice %>% filter(Point=='Head') %>% group_by(Type, ID, Run) %>% 
+  summarise(velocity=length.catwalk/max(t), 
+            mean.angle=mean.circular(CircAngle, na.rm=TRUE))
+
+velocity.CircularAngle$Type<- factor( velocity.angle$Type)
+
+velocity.CircularAngle %>% ggplot(aes(velocity, mean.angle, group=Type, colour=Type)) + 
+    geom_point(aes(colour=Type), size=4) +
+    scale_colour_manual(values=colours.def, name='Group',
+                      labels=levels(velocity.CircularAngle$Type)) + 
+   # geom_smooth(se=FALSE) + 
+    theme_classic() + 
+    NULL
+
+
+
+#### construct a classification tree
+
+model.tr1<- tree( Type ~ velocity + mean.angle, data=velocity.df)
+plot(model.tr1); text(model.tr1)
+
+with(velocity.df, plot(velocity, mean.angle), pch=19, col=as.numeric( velocity.df$Type))
+
+decisionplot( model.tr1, velocity.df,
+              class='Type', main='tree classifier')
+
+
+## construct a linear discriminant analysis classifier
+
+
+velocity.angle.x<- velocity.angle[, c(1, 4,5)]
+model.lda1<- tree(Type ~ velocity + mean.angle, data=velocity.angle.x)
+plot(model.lda1)
+text(model.lda1)
+
+decisionPlot( model.lda1, velocity.angle.x,
+              class='Type', main='linear discriminant classifier')
+
+
+ggplot(velocity, aes(y=velocity, group=Type, fill=Type)) + geom_boxplot()
+
+velocity[velocity$velocity>100,]
+## outlier = WTUT281.4c, run5
+
+possible.outlier<- 
+WTUT281.4c[WTUT281.4c$Run=="RUN5" & WTUT281.4c$Point=='Head', ]
+
+
+velocity %>% group_by(Type) %>% summarise(mean.velocity=mean(velocity),
+                                          sd.velocity=sd(velocity),
+                                          min.velocity=min(velocity),
+                                          max.velocity=max(velocity))  
+### WTUT281.4c  RUN5    105. 
+### WTUT281.4c  RUN2     17.8  - possibly wrong??
+
+############################# compute areas of ellipses ####
+
+b0<-all.mice$ID=="WTUT279.5f" & all.mice$Run=='RUN1'
+
+mouse.exm<- all.mice[b0, ]
+
+mouse.exm.ell<- rbind(mouse.exm, mouse.exm[1,])
+
+
+convexH<- ddply(mouse.exm.ell, .(Y, Angle), 
+                function(mouse.exm.ell) 
+                  mouse.exm.ell[chull(mouse.exm.ell$Y, mouse.exm.ell$Angle),])
+
+ellipse<- 
+  ggplot(mouse.exm.ell, 
+         mapping=aes(Y, Angle, colour='black', fill='gray')) +
+  geom_line() + theme_bw() + 
+  geom_polygon(data=convexH, alpha=0.2) + 
+  theme(legend.position='none') + 
+  NULL
+ellipse
+
+######################## work with velocity ####
+
+
+velocity<- read_excel('Velocity.xlsx')
+## 38 x 8
+names(velocity)[c(4,6,7,8)]<- c('Xstart', 'Xend','Yend','Ystart')
+
+velocity$velocity<- with(velocity, (Xend - Xstart)/t)
+colours.def<- wesanderson::wes_palette('Darjeeling1',3)[1:3]
+
+velocity$Group<- as.factor(velocity$Group)
+
+velocity$colours<- colours.def[as.numeric( velocity$Group)]
+
+velocity.df %>% ggplot(aes(Yend, velocity, colour=Group, group=Group)) + 
+        geom_point(aes(colour=Group), size=4) +
+        scale_colour_manual(values=colours.def, name='Group',
+                            labels=levels(velocity$Group)) + 
+        theme_classic() + 
+        NULL
+
+
+velocity.df %>% 
+   ggplot(aes(Type, velocity, fill=Type)) + 
+   geom_boxplot() + 
+   scale_y_continuous(breaks=seq(100,600,by=100)) +
+   scale_fill_manual(values=colours.def, name='Group',  
+                     labels=levels(velocity$Group),
+                     guide=guide_legend(values=colours.def)) + 
+   theme_classic() + 
+   NULL
+
+### plot velocity across subgroups of X
+
+### use data.frame mouse.data, which includes only ID = NPCTG294.2c
+### find length of valid catwalk for this mouse
+
+velocity[velocity$ID==levels(mouse.data$ID)[5], ]
+
+delta.x<- 20 ## set it at 20 units
+
+
+
+plot.velocity.ID<- function(ID, delta.x)
+{
+  ### plots velocity across X coordinates 
+  ### divides the X-range in n.cells = (X-end - X-start) 
+  ### delta.x is a fixed sub-interval length for all graphs
+  
+  ID<- as.character(ID)
+  data.mouse<- velocity[velocity$ID == ID, ] ### these values are wrt Centre
+  runs<- unique( data.mouse$Run)
+  n.cells <- with( data.mouse, ceiling( (Xend - Xstart)/delta.x)) 
+  ## run-specific
+  mouse.df<- all.mice[all.mice$ID==ID & all.mice$Point=='Centre', ]
+  x0<- mouse.df %>% group_by(Run) %>% summarise(min=min(X))
+  x1<- mouse.df %>% group_by(Run) %>% summarise(max=max(X))
+  
+  #summary.Velocity<- velocity %>% group_by(Group) %>% 
+  #  summarise(Q1=quantile(velocity,1/4), Q2=quantile(velocity,1/2),
+  #            Q3=quantile(velocity,3/4)) ## OK, summaries by group
+  
+
+  colours<- rev(wesanderson::wes_palette("Darjeeling1",2))
+  
+  for (i in seq(n.cells)) ### iterate over runs
+  {
+    aux0<- x0$min[i]+(0:(n.cells[i]-1))*delta.x ## lower limit
+    aux1<- x0$min[i]+(1:n.cells[i])*delta.x ## upper limit
+    aux.df<- mouse.df[mouse.df$Run==levels(mouse.df$Run)[i], ]
+    aux.df$intervalX<- as.numeric(cut(aux.df$X, breaks=c(aux0[1], aux1), 
+                           include.lowest=TRUE, right=FALSE))
+    diff.x <- with(aux.df, tapply(X, intervalX,
+                                 function(x){diff(range(x))}))
+    diff.t <- with(aux.df, tapply(t, intervalX,
+                                  function(x){diff(range(x))}))
+    AvgVel<- diff.x/diff.t
+    aux.df$Velocity<- AvgVel[aux.df$intervalX]
+    group<- as.character(aux.df$Type[1])
+    q1<- as.numeric(summary.Velocity[summary.Velocity$Group==group, 'Q1'])
+    q2<- as.numeric(summary.Velocity[summary.Velocity$Group==group, 'Q2'])
+    q3<- as.numeric(summary.Velocity[summary.Velocity$Group==group, 'Q3'])
+   # aux.df$Colour<- colours[as.numeric(ifelse(aux.df$Velocity <=q1, 1, 
+   #                         ifelse(aux.df$Velocity<=q3,2,3)))]
+   #  aux.df$VelFactor<- as.factor(ifelse(aux.df$Velocity <=q1, 1, 
+   #                                      ifelse(aux.df$Velocity<=q3,2,3)))
+     aux.df$Colour<- colours[as.numeric(ifelse(aux.df$Velocity <=q2, 1,2))] 
+     aux.df$VelFactor<- as.factor(ifelse(aux.df$Velocity <=q2, 1, 2))
+    
+    g1<- aux.df %>% ggplot(aes(x=Y, y=Angle, color=Colour, group=VelFactor)) +
+         geom_point(aes(color=Colour)) + 
+         scale_color_manual(values=colours, name='Velocity',
+                            labels=c('lowVel','highVel')) + 
+         theme_classic() + 
+         geom_vline(xintercept=0, size=1.25, col='black') + 
+         geom_hline(yintercept=0, size=1.25, col='black') + 
+         ggtitle(ID) + 
+         NULL
+  
+   print( g1)
+      
+  }
+    
+}
+
+plot.velocity.ID(levels(mouse.data$ID)[5], delta.x)
+

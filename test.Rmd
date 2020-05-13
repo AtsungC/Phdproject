@@ -1,0 +1,392 @@
+---
+title: "Statistical learning on Mice moverment"
+output: github_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = FALSE,message = FALSE)
+ library(readxl)
+ library(stringr)
+ library(ggplot2)
+ library(gganimate)
+ library(lubridate)
+ library(tidyverse)
+ library(plotly)
+ library(circular)
+ library(tree)       ### 2D
+ library(rpart.plot) ### 3D
+ library(plotmo)
+ library(dplyr)
+ library(caret)
+```
+# ML progect introduction
+
+This progect is on animal behavior analysis. The data was retrieved form Catwalk videos which is coordinates of head, centre and tail of a mouse while on gait analysis. An weight-independent variable, $\theta$, was firt introduced into gait analysis. This proof-of-concept project is going to apply relevent variables into machine learning algorithm. The aims are for classification of treatment groups.
+
+
+## Outline of the proccess
+
+1. Importing data
+  * all.mice
+  * 
+2. Calculate the rotating angle, ** $\theta$**
+  * Ploting the data
+3. Models bulding
+  * Supervised models 
+    * Linear regression
+      * Validate coeficients (t-test)
+      * Validate the model ($R^2$, correlation, F-test)
+    * Multiple regression
+    * k-nesrest neighor
+    * Desicion tree
+  
+  
+## Importing data
+
+* The data with coordinates were imported into R.
+  * all.mice (function : read.excel.sheet() )
+  
+* The calculation of the $\theta$ 
+  * all.mice with theta.T, theta.C (function : angle.calculation.tail() )
+  
+* The average velocity, theta and variety of theta
+  * vel.all.micev: 
+   mean velocity and mad.Y in head, centre and tail. 
+   mean and var of theta.C and theta.T.
+  
+* The interval velocity
+  * all.vel.summary:
+  vel, mad.Y, in.t (in head, centre and tail)
+  
+
+
+## all.mice
+
+```{r import, echo=FALSE, message=FALSE}
+# function for import
+
+read.excel.sheet <- function(filename){
+  names.sht <- excel_sheets(filename)
+  for(i in 1:length(names.sht)) 
+  { 
+    ifelse(i==1,T <- read_excel(filename,sheet = 1), T )
+    ifelse(i+1 <= length(names.sht),T2 <- as.data.frame(read_excel(filename,sheet = i+1)),next())
+    T  <- rbind.data.frame(T,T2)
+  }
+  return(T)
+}
+
+all.mice <-read.excel.sheet('NPCTG.xlsx')
+
+all.mice <- all.mice %>% rename(c('ID.RUN'='ID'))
+
+all.mice <- all.mice %>% 
+  mutate(
+    Run= str_extract(all.mice$ID.RUN,'RUN[0-9]+'),
+    ID= str_extract(all.mice$ID.RUN,'[A-Z]{4,5}[0-9]{3}\\.[0-9][a-z]'),
+    Group= str_extract(all.mice$ID.RUN,'^[A-Z]+')
+  )
+all.mice %>% select(ID,Group,Run,ID.RUN,everything())
+
+```
+
+## all.mice with theta 
+
+```{r theta  , echo=FALSE,message=FALSE}
+angle.calculation.tail <- function(filename1){
+
+  Head <-   filter(filename1, Point == 'Head')
+  Centre <- filter(filename1, Point == "Centre")
+  Tail <-   filter(filename1, Point == "Tail")
+  
+  calculation <- Head %>% select(ID.RUN,ID,Run,Group)
+  
+  calculation <- calculation %>% 
+    mutate(
+      X.tail.head = Head$X-Tail$X,
+      X.cent.head = Head$X-Centre$X,
+      
+      Y.tail.head = Head$Y-Tail$Y,
+      Y.cent.head = Head$Y-Centre$Y,
+      
+      X.tail.horizontal = Head$X-Tail$X,
+      X.cent.horizontal = Head$X-Centre$X,
+      horizontal.Y = 0
+      )
+  
+  calculation <- calculation %>% 
+    mutate(
+      Tail.angel =sign(Head$Y-Tail$Y)*180*(acos(calculation$X.tail.head * calculation$X.tail.horizontal /abs(calculation$X.tail.horizontal) / sqrt((calculation$X.tail.head)^2+(calculation$Y.tail.head)^2)))/(pi),
+      Centre.angel=sign(Head$Y-Centre$Y)*180*(acos(calculation$X.cent.head * calculation$X.cent.horizontal /abs(calculation$X.cent.horizontal) / sqrt((calculation$X.cent.head)^2+(calculation$ Y.cent.head)^2)))/(pi)
+    )
+  
+  Pts <- c('Head','Centre','Tail')
+  T2 <- data.frame()
+  for (i in Pts) {
+    T <- as.data.frame(eval(parse(text=i)))
+    T <- T %>% 
+      mutate(
+        Tail.theta = calculation$Tail.angel,
+        Centre.theta = calculation$Centre.angel
+      )
+   ifelse(i=='Head',T2 <- T,T2 <- rbind(T2,T))
+  }
+ T2 <- T2 %>% mutate(
+      theta.T = circular(rad(T2$Tail.theta),type='direction'),
+    theta.C = circular(rad(T2$Centre.theta),type='direction')
+ )
+ #  
+  return(T2)
+  
+}
+all.mice <- angle.calculation.tail(all.mice)
+head(all.mice)
+```
+
+## vel.all.mice (summary of each run)
+
+```{r average.velocity,echo=FALSE,message=FALSE,warning=FALSE}
+Average.velocity <- function(filename2){
+  points <- c('Head','Centre','Tail')
+  for (i in points) {
+    T <-filename2 %>% filter(Point==i) %>% 
+      group_by(Group,ID,Run) %>% 
+      dplyr::summarise(Xstart=X[which(t==0)],
+                       Ystart=Y[which(t==0)],
+                       Xend = X[which(t==max(t))],
+                       Yend = Y[which(t==max(t))],
+                       mean.velocity= abs(Xstart-Xend)/max(t),
+                       madY = median(abs(Y)),
+                       t = max(t),
+                       Point=i,
+                       mean.angle.C= mean.circular(abs(theta.C), na.rm=TRUE),
+                       mean.angle.T= mean.circular(abs(theta.T), na.rm=TRUE),
+                       var.angle.C = var.circular(abs(theta.C), na.rm=TRUE),
+                       var.angle.T = var.circular(abs(theta.T), na.rm=TRUE)
+                       
+                        )
+   
+        ifelse(i=='Head',all <- T,all <- rbind(all,T))
+   
+     
+  }
+  
+  return(all %>% 
+  dplyr::select(ID,Run,
+         Group,Point,
+         mean.velocity,
+         madY,mean.angle.C,
+         mean.angle.T,var.angle.C,
+         var.angle.T)
+  )
+  
+}
+
+Vel.all.mice <- Average.velocity(all.mice)
+head(Vel.all.mice)
+```
+
+## all.vel.mice (vel in certain interval)
+
+```{r interal velocity, echo=FALSE,message=FALSE,warning=FALSE}
+ex <- function(filename,run,number.of.window=10){
+  Pts <- c('Head','Centre','Tail')
+  d3 <- data.frame()
+  d4 <- data.frame()
+  for (j in Pts) {
+  # uni.run <- unique(all.mice$Run[which(all.mice$ID==filename)])
+  d0 <- all.mice %>% filter(ID==filename,Point==j,Run==run)
+  N.cell <- ceiling((max(d0$X)-min(d0$X))/number.of.window)
+  # N.cell <- ceiling(max(d0$X)/1)
+  CUT <- cut(d0$X,N.cell,labels = 1:N.cell)
+  d0 <- cbind(d0,CUT)
+  CUT1 <- unique(d0$CUT)
+  d2 <- data.frame()
+  
+  for (i in 1:length(CUT1)) {
+    d1 <- d0 %>% filter(CUT==CUT1[i])
+    d3 <- d1 %>% dplyr::summarise(
+      vel= unique(sqrt(max(X)-min(X))^2+(max(Y[which(X==max(X))])-min(Y[which(X==min(X))]))^2)/(max(t)-min(t)),
+      mad.Y = mad(Y),
+      in.t = max(t)-min(t),
+      Point=j,
+      # mad.ang = mad(theta)
+    )
+    ifelse(d3$in.t==0,next(),d2 <- rbind(d2,d3)) 
+  }
+  d4 <- rbind(d4,d2)
+  }
+  
+  return(d4)
+}
+ex2 <- function(filename){
+  uni.run <- unique(all.mice$Run[which(all.mice$ID==filename)] )
+  # leng.run <- length(uni.run)
+  dd1 <- data.frame()
+  for (i in uni.run) {
+    dd0 <- ex(filename,i)
+    dd1 <- rbind(dd1,dd0)
+  }
+  return(dd1)
+}
+
+ex3 <- function(filename){
+  ID <- unique(filename$ID)
+  dd1 <- data.frame()
+  for (i in ID) {
+    dd0 <- ex2(i)
+    dd0 <- dd0 %>% mutate(Group= str_extract(i,'^[A-Z]+'),
+                          ID= i)
+    dd1 <- rbind(dd1,dd0)
+  }
+  return(dd1)
+}
+
+all.vel.summary <- ex3(all.mice)
+head(all.vel.summary)
+```
+
+
+# Plotting 
+
+## all.mice
+
+### theta.C
+
+```{r theta.C plotting, echo=FALSE,warning=FALSE}
+all.mice %>% 
+  ggplot(aes(Group,theta.C))+
+  geom_boxplot(aes(fill=Group),alpha=1/2)+
+  theme_bw()+
+  NULL
+
+all.mice %>%
+  ggplot(aes(Group,theta.C))+
+  geom_boxplot(aes(fill=ID),alpha=1/2)+
+  theme_bw()+
+  NULL
+```
+
+### theta.T
+
+```{r theta.C plotting, echo=FALSE,warning=FALSE}
+all.mice %>% 
+  ggplot(aes(Group,theta.T))+
+  geom_boxplot(aes(fill=Group),alpha=1/2)+
+  # geom_point(aes(color=ID),alpha=1/10)+
+  # facet_wrap(~Group)+
+  theme_bw()+
+  NULL
+
+all.mice %>% 
+  ggplot(aes(Group,theta.T))+
+  geom_boxplot(aes(fill=ID),alpha=1/2)+
+  # geom_point(aes(color=ID),alpha=1/10)+
+  # facet_wrap(~Group)+
+  theme_bw()+
+  NULL
+```
+
+### theta.C against theta.T
+```{r theta.C against theta.T, echo=FALSE,warning=FALSE}
+all.mice %>% 
+  ggplot(aes(theta.C,theta.T))+
+  # geom_boxplot(aes(fill=ID),alpha=1/2)+
+  geom_point(aes(color=ID),alpha=1/10)+
+  coord_fixed(ratio=1)+
+  # facet_wrap(~Group)+
+  theme_bw()+
+  NULL 
+
+```
+
+## Vel.all.mice (each run)
+
+### mean velocity and madY
+
+```{r mean.velocity AND madY, echo=FALSE,warning=FALSE}
+Vel.all.mice %>% 
+  ggplot(aes(Point,mean.velocity))+
+  geom_boxplot()+
+  geom_point(aes(color=ID))+
+  facet_wrap(~Group)+
+  theme_bw()+
+  NULL
+Vel.all.mice %>% 
+  ggplot(aes(Point,madY))+
+  geom_boxplot()+
+  geom_point(aes(color=ID))+
+  facet_wrap(~Group)+
+  theme_bw()+
+  NULL
+```
+
+### mean angle in centre and tail
+
+```{r mean.angle.C AND mean.angle.T , echo=FALSE,warning=FALSE}
+Vel.all.mice %>% 
+  ggplot(aes(Group,mean.angle.C))+
+  geom_boxplot()+
+  geom_point(aes(color=ID))+
+  # facet_wrap(~Group)+
+  theme_bw()+
+  NULL
+Vel.all.mice %>% 
+  ggplot(aes(Group,mean.angle.T))+
+  geom_boxplot()+
+  geom_point(aes(color=ID))+
+  # facet_wrap(~Group)+
+  theme_bw()+
+  NULL
+```
+
+### variety angle centre and tail
+
+```{r var.angle.C AND var.angle.T, echo=FALSE,warning=FALSE}
+Vel.all.mice %>% 
+  ggplot(aes(Group,var.angle.C))+
+  geom_boxplot()+
+  geom_point(aes(color=ID))+
+  # facet_wrap(~Group)+
+  theme_bw()+
+  NULL
+Vel.all.mice %>% 
+  ggplot(aes(Group,var.angle.T))+
+  geom_boxplot()+
+  geom_point(aes(color=ID))+
+  # facet_wrap(~Group)+
+  theme_bw()+
+  NULL
+```
+
+## all.mice.summary 
+
+### velocity, mad.Y and in.t 
+
+```{r all.mice.summary velocity, mad.Y and in.t, echo=FALSE,warning=FALSE}
+all.vel.summary %>% 
+  # filter(Group=='WTUT')%>%  
+  ggplot(aes(Point,vel))+
+  coord_cartesian(ylim = c(0,1000))+
+  geom_boxplot()+
+  geom_point(aes(color=ID))+
+  facet_wrap(~Group)+
+NULL
+all.vel.summary %>% 
+  # filter(Group=='WTUT')%>%  
+  ggplot(aes(Point,mad.Y))+
+  # coord_cartesian(ylim = c(0,1000))+
+  geom_boxplot()+
+  geom_point(aes(color=ID))+
+  facet_wrap(~Group)+
+NULL
+all.vel.summary %>% 
+  # filter(Group=='WTUT')%>%  
+  ggplot(aes(Point,in.t))+
+  # coord_cartesian(ylim = c(0,1000))+
+  geom_boxplot()+
+  geom_point(aes(color=ID))+
+  facet_wrap(~Group)+
+NULL
+```
+
