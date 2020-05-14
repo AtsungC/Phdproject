@@ -40,19 +40,24 @@ read.excel.sheet <- function(filename){
   }
   return(T)
 }
- #######################################
+####################################### 
+#importing data from excel
 all.mice <-read.excel.sheet('NPCTG.1.xlsx')
-##### drup_na
+
+# check NA and drop_NA
 any(is.na(all.mice))
 which(is.na(all.mice))
 filter(all.mice,is.na(ID))
-dim(all.mice)
-dim(filter(all.mice,Point=='Centre'))
-check <- all.mice %>% group_by(ID,Point) %>% dplyr::summarise(
-  n =n()
-)
+dim(all.mice) 
 
-################## separate ID, Run and Group with regular expression
+dim(filter(all.mice,Point=='Centre'))
+
+check <- all.mice %>%  # check the number of data of each run in three points
+  group_by(ID,Point) %>% 
+  dplyr::summarise(n =n())
+
+################## 
+# separate ID, Run and Group with regular expression
 all.mice <- all.mice %>% rename(c('ID.RUN'='ID'))
 
 all.mice <- all.mice %>% 
@@ -61,8 +66,6 @@ all.mice <- all.mice %>%
     ID= str_extract(all.mice$ID.RUN,'[A-Z]{4,5}[0-9]{3}\\.[0-9][a-z]'),
     Group= str_extract(all.mice$ID.RUN,'^[A-Z]+')
   )
-
-
 all.mice %>% select(ID,Group,Run,ID.RUN,everything())
  
 # location.Run <- as.data.frame(str_locate(all.mice$ID,pattern = 'RUN'))
@@ -156,7 +159,8 @@ angle.calculation.tail <- function(filename1){
   
 }
 ####################################
-all.mice <- angle.calculation.tail(all.mice)
+# all.mice data with angle
+all.mice <- angle.calculation.tail(all.mice) 
 any(is.na(all.mice))
 names(all.mice)
 

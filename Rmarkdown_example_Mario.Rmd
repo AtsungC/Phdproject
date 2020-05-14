@@ -1,0 +1,1051 @@
+---
+output:
+  pdf_document:
+    number_sections: yes
+    toc: yes
+    toc_depth: 3
+title: "PHARMACOKINETIC Modelling Report: Intravenous and Oral Fosfomycin in Hospitalised Neonates with Clinical Sepsis (Neo-Fosfo): an open-label safety and pharmacokinetic study"
+author:
+- Zoe Kane
+ - zoe.kane.18ucl.ac.uk
+- UCL Great Ormond Street Institute of Child Health
+- "Document reference: NeoFosfo/V01"
+- "V01 issued: 24/05/2019"
+#bibliography: Fosfo_Refs.bib
+ 
+---
+
+ 
+```{r setup, include=FALSE,eval=FALSE}
+ 
+knitr::opts_chunk$set(echo = TRUE, fig.pos = 'H')
+knitr::include_graphics("temp.png")
+ 
+ 
+ 
+library(gdata) ; library(lattice) ; library(xpose4) ; library(knitr)
+library(ggplot2) ; library(gdata);library(grid) ; library(gridExtra); library(kableExtra);library(float)
+library(tidyverse)
+ 
+ 
+setwd("/home/zoe/Documents/Fosfomycin_Project/PK_Report/06May/wk20/modelling190520")
+source("nonmem_gof.R")
+source("nonmem_ofv.R")
+source("nonmem..gof.R")
+source(".RSE.v2.R")
+source(".RSE.R33.R")
+source("nonmem.iplot.zk.R")
+```
+ 
+# Version Control
+ 
+Version number     | Description                                |
+ -----------------  | ------------------------------------------ |
+ NeoFosfo/V01       | Drafted by Zoe Kane and circulated for     |
+.                  | review on 24052019                         |                               
+ .                  |                                            |
+                    |                                            |
+ 
+# Introduction
+This modelling report is written in accordance with the University College London (UCL) pharmacometrics group Standard Operating Procedure for Pharmacokinetic/Pharmacodynamic (PK/PD) Modelling SOP/PKPD/V01.
+ 
+The Neo-Fosfo study was funded by GARPD/DNDi and is primarily concerned with determining the safety and pharmacokinetics (PK) of intravenous (IV) and oral (PO) fosfomycin in neonates with suspected sepsis. 
+ 
+# Methods
+ 
+## Description of the study
+ 
+The Neo-Fosfo study was performed in Kilifi hospital in Kenya and ran between XXXX and XXXXX. 120 patients were enrolled in the study, half the patients were randomised to receive only standard 1st line care, while the other half also received 100 mg/kg fosfomycin. The patients randomised to the plus fosfomycin treatment received a minimum of 4 IV doses (Fomicyt 40 mg/mL solution, InfectoPharma, Germany) every 12 hours and then if/when appropriate were transferred to an oral fosfomycin (Fosfocina 250 mg/5mL suspension, ERN Laboratories, Spain) therapy. Collection of 4 PK samples was defined in the protocol, 2 following the first IV dose (PK1-early and PK2-late) and 2 following the 1st oral dose (PK3-early and PK4-late).  Patients were randomised to one of 3 possible *early* or *late* PK time points as follows:
+ 
+#. Early: 5 min, 30 min or 1 hr post dose
+#. Late: 2 hrs, 4 hrs or 8 hrs post dose
+ 
+To minimise invasiveness no pre dose (trough) sample was taken prior to the first oral dose. Six  subjects (~10% of the population) had an additional 5th PK sample taken around the time of their final oral dose, which for the subjects in question was after either the 9th or 10th oral dose. These additional PK samples have been included in the modelling as robust dosing information is available for all intervening oral doses
+ 
+## Data Handling and Software
+ 
+PK sample bioanalysis was undertaken between xxxxxxxxxxxx and xxxxxxxxxxxxx. Since plasma protein binding of fosfomycin is negligible [@Zeitlinger2004, @Kirby1977 and @Kestle1969] plasma samples were only analysed for the total fosfomycin concentration and calculation of free fosfomycin levels has not been necessary.
+ 
+As the PK data is considered to be sparse (fewer samples per subject than the expected number of model parameters) and unbalanced (not all subjects had samples taken at the same time points), the data will be modelled using non-linear mixed-effects software (NONMEM version 7.3)
+ 
+## Data Preparation and QC
+ 
+R scripts have been developed to merge covariate (demographics and biochemistry), date/time (dosing and sampling) and bioanalytical information (fosfomycin plasma levels), thus preparing a single NONMEM ready data file. The R script that was used to generate the NONMEM datafiles analysed as part of this work has been saved as "dataclean190520.r"
+ 
+The source data file was provided by EC on the 26th April at 13:09 and the file was named "Neo-fosfo-001 PK results_updated_26apr19_final.xlsx". The file contained three spreadsheets that contained; date/time information, bioanalytical results (plasma concentrations) and demographic plus covariate data.
+ 
+The QC steps outlined by @Bonate2012 were followed, and data queries sent to the study team for resolution. As part of the QC process data visualisation plots (individual Cp-time plots) and covariate summary statistics were generated and shared with the wider team on the 25th April at 15:04, the file was named "FinalPKDataset.v2.pdf".
+ 
+### Missing data
+ 
+All missing PK data has been accounted for and it has not been necessary to excluded and plasma concentration data due to missing dosing information (date, time or dose amount).
+ 
+Some biochemistry covariate data (e.g Scr and Na) is missing for a few subjects but as <5% of the dataset are missing the approach has been to set the individual to the median value of the population (using all the data; baseline and day2).
+ 
+### Outliers
+ 
+During model building no sample with a conditional weighted residual (CWRES) of 6 or more was identified and therefore no subjects have been removed as outliers.
+ 
+# Results
+ 
+## Pharmacokinetic Modelling - Structural and Statistical (*Base*) Model
+ 
+###  IV Only Modelling
+ 
+The IV PK data for all subjects was analysed to determine the most appropriate residual error model, which parameters intra-individual variability maybe estimated for and whether a 1 or 2 compartment model best described the distribution and elimination of fosfomycin in this population.
+ 
+Table 2 summarises the model (description) the OFV and whether the run successfully converged (Min.Success = yes and zero.grads = no). Using a 1-compartment distribution and elimination model (2 parameters) the best run is run 8 (IIV on CL only and a proportional error model). Unfortunately using just the IV data it is not possible to estimate IIV on volume or the covariance between CL and Volume with either a 1-CMT (Run3-7) or 2-CMT model (Run9). Applying the same statistical model (IIV on CL only and the proportional error - R8) to a 2 compartmental structural model (4 parameters) as in run 9 we see a significant fall in the -2 log likelihood (-2LL) ratio (-$\Delta$OFV>6.64 per parameter is needed at a level of p<0.01), therefore the decision has been to proceed to modelling the combined IV and PO dataset using a 2 compartment model with IIV on CL and proportional residual error model (Run9).
+ 
+ 
+```{r nonmem1, echo=FALSE,,eval=FALSE}
+setwd("/home/zoe/Documents/Fosfomycin_Project/PK_Report/06May/wk20/modelling190520")
+Run <- 1
+Description <- "1comp IV only, no IIV, add & prop error"
+Data <- "190520.IVonly.run1.csv "
+Data_excluded <-  "none"
+OFV <- nonmem.ofv(1)
+cov.step <- "no"
+Min.Succes <- "yes"
+zero.grads <- "no"
+ 
+#
+Run <- c(Run, 2)
+Description <- c(Description , "1comp IV only, IIV on CL, add & prop error")
+Data <- c(Data, "190520.IVonly.run1.csv ")
+Data_excluded <- c(Data_excluded, "none")
+OFV <- c(OFV, nonmem.ofv(2))
+cov.step <- c(cov.step, "no")
+Min.Succes <- c(Min.Succes, "yes")
+zero.grads <- c(zero.grads,"no")
+#
+Run <- c(Run, 3)
+Description <- c(Description , "1comp IV only, IIV on CL and V, add & prop error ")
+Data <- c(Data, "190520.IVonly.run1.csv ")
+Data_excluded <- c(Data_excluded, "none")
+OFV <- c(OFV, nonmem.ofv(3))
+cov.step <- c(cov.step, "no")
+Min.Succes <- c(Min.Succes, "yes")
+zero.grads <- c(zero.grads,"yes")
+ 
+Run <- c(Run, 4)
+Description <- c(Description , "1comp IV only, IIV on CL and V, prop err ")
+Data <- c(Data, "190520.IVonly.run1.csv ")
+Data_excluded <- c(Data_excluded, "none")
+OFV <- c(OFV, nonmem.ofv(4))
+cov.step <- c(cov.step, "no")
+Min.Succes <- c(Min.Succes, "no")
+zero.grads <- c(zero.grads,"yes")
+ 
+Run <- c(Run, 5)
+Description <- c(Description , "1comp IV only, IIV on CL and V, add err ")
+Data <- c(Data, "190520.IVonly.run1.csv ")
+Data_excluded <- c(Data_excluded, "none")
+OFV <- c(OFV, nonmem.ofv(5))
+cov.step <- c(cov.step, "no")
+Min.Succes <- c(Min.Succes, "no")
+zero.grads <- c(zero.grads,"yes")
+ 
+Run <- c(Run, 6)
+Description <- c(Description , "1comp IV only, OMEGA BLOCK, prop err ")
+Data <- c(Data, "190520.IVonly.run1.csv ")
+Data_excluded <- c(Data_excluded, "none")
+OFV <- c(OFV, nonmem.ofv(6))
+cov.step <- c(cov.step, "no")
+Min.Succes <- c(Min.Succes, "no")
+zero.grads <- c(zero.grads,"yes")
+ 
+Run <- c(Run, 7)
+Description <- c(Description , "1comp IV only + Allom, IIV CL and V, prop err ")
+Data <- c(Data, "190520.IVonly.run1.csv ")
+Data_excluded <- c(Data_excluded, "none")
+OFV <- c(OFV, nonmem.ofv(7))
+cov.step <- c(cov.step, "no")
+Min.Succes <- c(Min.Succes, "no")
+zero.grads <- c(zero.grads,"yes")
+ 
+Run <- c(Run, 8)
+Description <- c(Description , "1comp IV only, IIV CL, prop err ")
+Data <- c(Data, "190520.IVonly.run1.csv ")
+Data_excluded <- c(Data_excluded, "none")
+OFV <- c(OFV, nonmem.ofv(8))
+cov.step <- c(cov.step, "no")
+Min.Succes <- c(Min.Succes, "yes")
+zero.grads <- c(zero.grads,"no")
+ 
+Run <- c(Run, 81)
+Description <- c(Description , "1comp IV only, IIV CL, add err ")
+Data <- c(Data, "190520.IVonly.run1.csv ")
+Data_excluded <- c(Data_excluded, "none")
+OFV <- c(OFV, nonmem.ofv(81))
+cov.step <- c(cov.step, "no")
+Min.Succes <- c(Min.Succes, "yes")
+zero.grads <- c(zero.grads,"no")
+ 
+Run <- c(Run, 9)
+Description <- c(Description , "2comp IV only, IIV CL, prop err ")
+Data <- c(Data, "190520.IVonly.run1.csv ")
+Data_excluded <- c(Data_excluded, "none")
+OFV <- c(OFV, nonmem.ofv(9))
+cov.step <- c(cov.step, "no")
+Min.Succes <- c(Min.Succes, "yes")
+zero.grads <- c(zero.grads,"no")
+ 
+Run <- c(Run, 91)
+Description <- c(Description , "2comp IV only, IIV CL & V2, prop err ")
+Data <- c(Data, "190520.IVonly.run1.csv ")
+Data_excluded <- c(Data_excluded, "none")
+OFV <- c(OFV, nonmem.ofv(91))
+cov.step <- c(cov.step, "no")
+Min.Succes <- c(Min.Succes, "yes")
+zero.grads <- c(zero.grads,"yes")
+ 
+ 
+ 
+d.tab <- data.frame(Run,Description, OFV, cov.step,Min.Succes,zero.grads)
+ 
+kable(d.tab, caption = "IV only Model Development", digits=1,"latex", booktabs = T) %>% kable_styling(latex_options =c("hold_position"))
+ 
+# Pilot is not now significant:
+#paste("p =",round(1- pchisq(nonmem..ofv(1)-nonmem..ofv(2),1),5)) ## last number is the number of digits, number before is??
+paste("p =", 1- pchisq(nonmem..ofv(8)-nonmem..ofv(9),df = 2))
+                          
+```
+ 
+ 
+ 
+Goodness of fit plots for Run9 are shown in Figure 1 and the model parameters for the best IV only model (Run9) are presented in Table 3 below.
+```{r nonmem4, echo=FALSE,,eval=FALSE}
+ 
+setwd("/home/zoe/Documents/Fosfomycin_Project/PK_Report/06May/wk20/modelling190520")
+Run4 <- 9
+Description4 <- "2comp IV only, IIV on CL, prop only"
+OFV4 <- nonmem.ofv(9)
+parm4<-nonmem.param(9)
+CL4<-parm4$THETA1
+V24<-parm4$THETA2
+Q4<-parm4$THETA3
+V34<-parm4$THETA4
+IIV_CL4<-sqrt(parm4$OMEGA.1.1.)*100
+Prop.Err4<-sqrt(parm4$SIGMA.2.2.)*100
+ 
+ 
+ 
+d.tab4 <- data.frame(Run4, OFV4, CL4, V24, Q4, V34, IIV_CL4, Prop.Err4)
+ 
+colnames(d.tab4) <- c("Run", "OFV", "CL(L/hr)", "Vc(L)", "Q(/hr)", "Vp(L)", "IIV CL(%)", "Prop Error(%)")
+ 
+kable(d.tab4, caption = "Best 2-CMT IV only Model (Run9)", digits=c(0,1,2,2,2,2,1,1),"latex", booktabs = T) %>% kable_styling(latex_options =c("hold_position"))
+ 
+ 
+                          
+```
+ 
+ 
+```{r gofs, fig.cap="IV only, 2CMT, IIV on CL only - Run9", fig.width=10, fig.height=7, echo=FALSE, out.extra='',eval=FALSE}
+nonmem..gof(9)
+```
+ 
+### IV and PO Modelling
+ 
+The best IV only model was achieved using 2-compartmental distribution/elimination model with IIV on CL and a proportional residual error model (Run9) therefore this was taken forward to modelling the IV and PO data simultaneously to allow estimation of Ka and F%. It was not necessary to fix the CL and V estimates to those obtained from just IV only modelling as no significant deviation from these was observed. As the dataset more than doubles through inclusion on the oral PK data (10% of the population have a 3rd oral sample; PK5) it has been possible to estimate inter-individual variability on additional parameters (more than just CL), see Table 6 and 7. Comparing Run10 with Run 11, 12 and 14 the OFV can be seen to decrease R10>R11>R14>R12 and only in Run14 is there a significant difference in the estimates of Q and a shift from Vc to Vp whilst broadly maintaining Vss.
+ 
+ 
+ 
+```{r nonmem5, echo=FALSE,eval=FALSE}
+setwd("/home/zoe/Documents/Fosfomycin_Project/PK_Report/06May/wk20/modelling190520")
+Run5 <- 9
+Description5 <- "2comp IV only, IIV on CL, prop error"
+Data5 <- "190520.IVonly.run1.csv "
+Data_excluded5 <-  "none"
+OFV5 <- nonmem.ofv(9)
+cov.step5 <- "yes"
+Min.Succes5 <- "yes"
+zero.grads5 <- "no"
+ 
+#
+Run5 <- c(Run5, 10)
+Description5 <- c(Description5 , "2comp IV & PO, IIV on CL, prop error")
+Data5 <- c(Data5, "190520f.csv ")
+Data_excluded5 <- c(Data_excluded5, "none")
+OFV5 <- c(OFV5, nonmem.ofv(10))
+cov.step5 <- c(cov.step5, "yes")
+Min.Succes5 <- c(Min.Succes5, "yes")
+zero.grads5 <- c(zero.grads5,"no")
+#
+Run5 <- c(Run5, 11)
+Description5 <- c(Description5 , "As R10 + IIV on Vc, prop error")
+Data5 <- c(Data5, "190520f.csv ")
+Data_excluded5 <- c(Data_excluded5, "none")
+OFV5 <- c(OFV5, nonmem.ofv(11))
+cov.step5 <- c(cov.step5, "yes")
+Min.Succes5 <- c(Min.Succes5, "yes")
+zero.grads5 <- c(zero.grads5,"no")
+ 
+Run5 <- c(Run5, 12)
+Description5 <- c(Description5 , "As R10 + IIV on Vc and F1, prop error")
+Data5 <- c(Data5, "190520f.csv ")
+Data_excluded5 <- c(Data_excluded5, "none")
+OFV5 <- c(OFV5, nonmem.ofv(12))
+cov.step5 <- c(cov.step5, "yes")
+Min.Succes5 <- c(Min.Succes5, "yes")
+zero.grads5 <- c(zero.grads5,"no")
+ 
+Run5 <- c(Run5, 14)
+Description5 <- c(Description5 , "As R10 + IIV on F, prop error")
+Data5 <- c(Data5, "190520f.csv ")
+Data_excluded5 <- c(Data_excluded5, "none")
+OFV5 <- c(OFV5, nonmem.ofv(14))
+cov.step5 <- c(cov.step5, "yes")
+Min.Succes5 <- c(Min.Succes5, "yes")
+zero.grads5 <- c(zero.grads5,"no")
+ 
+Run5 <- c(Run5, 15)
+Description5 <- c(Description5 , "As R10 + IIV on Ka, prop error")
+Data5 <- c(Data5, "190520f.csv ")
+Data_excluded5 <- c(Data_excluded5, "none")
+OFV5 <- c(OFV5, nonmem.ofv(15))
+cov.step5 <- c(cov.step5, "no")
+Min.Succes5 <- c(Min.Succes5, "yes")
+zero.grads5 <- c(zero.grads5,"yes")
+ 
+Run5 <- c(Run5, 13)
+Description5 <- c(Description5 , "As R10 + OMEGA BLOCK (6), prop error")
+Data5 <- c(Data5, "190520f.csv ")
+Data_excluded5 <- c(Data_excluded5, "none")
+OFV5 <- c(OFV5, nonmem.ofv(13))
+cov.step5 <- c(cov.step5, "no")
+Min.Succes5 <- c(Min.Succes5, "yes")
+zero.grads5 <- c(zero.grads5,"yes")
+ 
+ 
+d.tab5 <- data.frame(Run5,Description5, OFV5, cov.step5,Min.Succes5,zero.grads5)
+colnames(d.tab5) <- c("Run","Description", "OFV", "cov.step", "Min.Succes", "zero.grads")
+kable(d.tab5, caption = "IV and PO Model Development", digits=1,linesep = "","latex", booktabs = T) %>% kable_styling(latex_options =c("hold_position"))
+ 
+# Pilot is not now significant:
+### Only use this when adding extra thetas
+#paste("p =",round(1- pchisq(nonmem..ofv(1)-nonmem..ofv(2),1),5)) ## last number is the number of digits, number before is??
+#paste("p =", 1- pchisq(nonmem..ofv(8)-nonmem..ofv(9),df = 2))
+                           
+```
+ 
+```{r nonmem6, echo=FALSE,eval=FALSE}
+setwd("/home/zoe/Documents/Fosfomycin_Project/PK_Report/06May/wk20/modelling190520")
+#
+Run6 <- 9
+Description6 <- "2comp IV only, IIV on CL, prop only"
+OFV6 <- nonmem.ofv(9)
+parm6<-nonmem.param(9)
+CL6<-parm6$THETA1
+V26<-parm6$THETA2
+Q6<-parm6$THETA3
+V36<-parm6$THETA4
+KA6<-as.numeric(NA)
+F16<-as.numeric(NA)
+IIV_CL6<-sqrt(parm6$OMEGA.1.1.)*100
+IIV_V26<-as.numeric(NA)
+IIV_KA6<-as.numeric(NA)
+IIV_F16<-as.numeric(NA)
+Prop.Err6<-sqrt(parm6$SIGMA.2.2.)*100
+#
+Run6 <- c(Run6,10)
+Description6 <- c(Description6,"As R10 + IIV on Vc, prop only")
+OFV6 <- c(OFV6,nonmem.ofv(10))
+parm6<- nonmem.param(10)
+CL6<-c(CL6,parm6$THETA1)
+V26<-c(V26,parm6$THETA2)
+Q6<-c(Q6, parm6$THETA3)
+V36<-c(V36, parm6$THETA4)
+KA6<-c(KA6, parm6$THETA5)
+F16<-c(F16, parm6$THETA6*100)
+IIV_CL6<-c(IIV_CL6, (sqrt(parm6$OMEGA.1.1.)*100))
+IIV_V26<-c(IIV_V26, (sqrt(parm6$OMEGA.2.2.)*100))
+IIV_KA6<-c(IIV_KA6, as.numeric(NA))
+IIV_F16<-c(IIV_F16, as.numeric(NA))
+Prop.Err6<-c(Prop.Err6, (sqrt(parm6$SIGMA.2.2.)*100) )
+ 
+Run6 <- c(Run6,11)
+Description6 <- c(Description6,"As R10 + IIV on Vc, prop only")
+OFV6 <- c(OFV6,nonmem.ofv(11))
+parm6<- nonmem.param(11)
+CL6<-c(CL6,parm6$THETA1)
+V26<-c(V26,parm6$THETA2)
+Q6<-c(Q6, parm6$THETA3)
+V36<-c(V36, parm6$THETA4)
+KA6<-c(KA6, parm6$THETA5)
+F16<-c(F16, parm6$THETA6*100)
+IIV_CL6<-c(IIV_CL6, (sqrt(parm6$OMEGA.1.1.)*100))
+IIV_V26<-c(IIV_V26, (sqrt(parm6$OMEGA.2.2.)*100))
+IIV_KA6<-c(IIV_KA6, as.numeric(NA))
+IIV_F16<-c(IIV_F16, as.numeric(NA))
+Prop.Err6<-c(Prop.Err6, (sqrt(parm6$SIGMA.2.2.)*100) )
+#
+Run6 <- c(Run6,14)
+Description6 <- c(Description6,"As R10 + IIV on F%, prop only")
+OFV6 <- c(OFV6,nonmem.ofv(14))
+parm6<- nonmem.param(14)
+CL6<-c(CL6,parm6$THETA1)
+V26<-c(V26,parm6$THETA2)
+Q6<-c(Q6, parm6$THETA3)
+V36<-c(V36, parm6$THETA4)
+KA6<-c(KA6, parm6$THETA5)
+F16<-c(F16, parm6$THETA6*100)
+IIV_CL6<-c(IIV_CL6, (sqrt(parm6$OMEGA.1.1.)*100))
+IIV_V26<-c(IIV_V26, as.numeric(NA))
+IIV_KA6<-c(IIV_KA6, as.numeric(NA))
+IIV_F16<-c(IIV_F16, parm6$OMEGA.6.6.)
+Prop.Err6<-c(Prop.Err6, (sqrt(parm6$SIGMA.2.2.)*100) )
+ 
+Run6 <- c(Run6,12)
+Description6 <- c(Description6,"As R10 + IIV on Vc and F%, prop only")
+OFV6 <- c(OFV6,nonmem.ofv(12))
+parm6<- nonmem.param(12)
+CL6<-c(CL6,parm6$THETA1)
+V26<-c(V26,parm6$THETA2)
+Q6<-c(Q6, parm6$THETA3)
+V36<-c(V36, parm6$THETA4)
+KA6<-c(KA6, parm6$THETA5)
+F16<-c(F16, parm6$THETA6*100)
+IIV_CL6<-c(IIV_CL6, (sqrt(parm6$OMEGA.1.1.)*100))
+IIV_V26<-c(IIV_V26, (sqrt(parm6$OMEGA.2.2.)*100))
+IIV_KA6<-c(IIV_KA6, as.numeric(NA))
+IIV_F16<-c(IIV_F16, parm6$OMEGA.6.6.)
+Prop.Err6<-c(Prop.Err6, (sqrt(parm6$SIGMA.2.2.)*100) )
+ 
+d.tab6 <- data.frame(Run6, OFV6, CL6, V26,Q6,V36, KA6, F16, IIV_CL6, IIV_V26, IIV_KA6, IIV_F16, Prop.Err6)
+ 
+colnames(d.tab6) <- c("Run", "OFV", "CL(L/hr)", "Vc(L)", "Q(L/hr)","Vp(L)","KA(/hr)", "F1(%)", "IIV CL(%)", "IIV Vc(%)", "IIV KA(%)", "IIV F1", "Prop Error(%)")
+ 
+ 
+kable(d.tab6, digits = c(0,0,2,2,2,2,2,2,2,2,2,2,1),linesep = "", caption = "Parameter Estimates from 2-CMT IV and PO Modelling", "latex", booktabs = T) %>% kable_styling(latex_options =c("hold_position", "scale_down")) %>% footnote(number = c("IIV on F% is reported directly as the OMEGA value"))
+ 
+ 
+ 
+```
+ 
+Of the successful (min.success = yes, cov.step = yes, zero.grad = no) runs, Run12 has been identified as the best *Base* (structural and statistical) model and relative standards errors (%RSE) of parameters estimates and intra-subject variability are presented in Table 8.
+ 
+Goodness of fit (GOF) and visual predictive check (VPC) plots for Run12 (the *Base* structural and statistical model) can be found in Figure 2 and 3 and individual predictions (iplots) in Figure 4.
+\newpage
+ 
+```{r, RSE, echo=FALSE,out.extra='',eval=FALSE}
+nonmem.RSE(12)
+```
+ 
+ 
+```{r gof2, fig.cap="GOF - Run12 (IV and PO, 2CMT, IIV on CL Vc and F, Prop Error)", fig.width=10, fig.height=7, echo=FALSE, out.extra='',eval=FALSE}
+nonmem..gof(12)
+```
+ 
+```{r VPC1, fig.cap="VPC - Run12", fig.width=10, fig.height=5,echo=FALSE, out.extra='',eval=FALSE}
+ 
+library(xpose4)
+cex.n <- 1 ; cex.pt <- 0.7
+ 
+vpc.std <- xpose.VPC(vpc.info = "./run12VPC/vpc_results.csv", by = "ROUTE", # IV = 1, PO =2,
+                     vpctab = "./run12VPC/vpctab12",
+                     PI.ci.area.smooth=T,                  
+                     PI.ci.med.arcol=grey(0.5),PI.ci.up.arcol=grey(0.5),
+                     PI.ci.down.arcol=grey(0.5),
+                     PI.real.med.col="black",#logy=T,
+                     PI.real.up.col="black",PI.real.down.col="black",
+                     pch=16,col=grey(0.3),cex=cex.pt,main="",
+                     xlb=list(label="Time after dose (h)",cex=cex.n),
+                     ylb=list(label="Concentration (mg/L)",cex=cex.n),
+                     xlab.top=list(label="Visual predictive check",cex=cex.n))
+vpc.std
+ 
+```
+ 
+\newpage
+ 
+```{r iplot, fig.cap="iplot - Run12 (IV and PO, 2CMT, IIV on CL Vc and F, Prop Error)", fig.width=9, fig.height=13, echo=FALSE, out.extra='',eval=FALSE}
+nonmem..iplot(12)
+```
+ 
+\newpage
+ 
+## Pharmacokinetic Modelling - Covariate Model
+ 
+### Neofosfo Demographics
+ 
+Key baseline demographic information for the study population are summarised in Table 9 and Figure 5. Subject 84 and 59 are the 2 heaviest babies weighing 4620 and 5670 grams respectively. Only 5 of the 60 babies are more than 10days old at admission; subject 1 and 113 are both 11 days old, subjects 82 and 84 are both 22 days old and subject 14 is the oldest at 24 days post birth. To facilitate covariate modelling the first day of life has been set to day = 0.
+ 
+```{r, covariates, echo=F,eval=FALSE}
+ 
+# reading in nonmem modelling data file which is produce in datacleaning R script: 06May/wk20/datacleaning/190520.r.
+nonmem.dat <- read.csv("190516f.csv", header =T, stringsAsFactors = F)
+demographics <- nonmem.dat %>% select(ID,TIME,WT,GA,PNADAYS,PMAWEEKS,SCR,Na)
+demographics <- subset(demographics, TIME == 0)
+demographics$PNADAYS2 <- demographics$PNADAYS - 1
+ 
+Covariate <- "WT (grams)"
+min <- min(demographics$WT)
+median <- median(demographics$WT)
+max <- max(demographics$WT)
+ 
+Covariate <- c(Covariate, "GA (weeks)")
+min <- c(min, min(demographics$GA))
+median <- c(median, median(demographics$GA))
+max <- c(max, max(demographics$GA))
+ 
+Covariate <- c(Covariate, "PNA (days)") # first day of life set to = 1 rather than 0.
+min <- c(min, min(demographics$PNADAYS2))
+median <- c(median, median(demographics$PNADAYS2))
+max <- c(max, max(demographics$PNADAYS2))
+ 
+Covariate <- c(Covariate, "PMA (weeks)")
+min <- c(min, min(demographics$PMAWEEKS))
+median <- c(median, median(demographics$PMAWEEKS))
+max <- c(max, max(demographics$PMAWEEKS))
+ 
+Covariate <- c(Covariate, "Serum Creatinine (micromol/L)")
+min <- c(min, min(demographics$SCR))
+median <- c(median, median(demographics$SCR))
+max <- c(max, max(demographics$SCR))
+ 
+Covariate <- c(Covariate, "Sodium Conc (micromol/L)")
+min <- c(min, min(demographics$Na))
+median <- c(median, median(demographics$Na))
+max <- c(max, max(demographics$Na))
+ 
+cov.tab <- data.frame(Covariate, min, median, max)
+ 
+#colnames(d.tab6) <- c("Run", "OFV", "CL(L/hr)", "Vc(L)", "Q(L/hr)","Vp(L)","KA(/hr)", "F1(%)", "IIV CL(%)", "IIV Vc(%)", "IIV KA(%)", "IIV F1 (%)", "Prop Error(%)")
+ 
+ 
+kable(cov.tab, digits = c(0,0,0,0),linesep = "", caption = "Demographic Summary Statistics", "latex", booktabs = T) %>% kable_styling(latex_options =c("hold_position"))
+ 
+```
+ 
+```{r, echo=F, covariates2, fig.cap="Neofosfo Population Demographics" , out.extra='', fig.width = 7, fig.height = 8,eval=FALSE}
+ 
+par(mfrow=c(2,4))
+boxplot(demographics$WT,
+        main="Weight (grams)",
+        ylim = c(1500,6000))
+boxplot(demographics$GA,
+        main="Gestational Age (wks)",
+        ylim = c(34,48))
+boxplot(demographics$PNADAYS2,
+        main="PNA (days)",
+        ylim = c(0,25))
+boxplot(demographics$PMAWEEKS,
+        main = "PMA (wks)",
+        ylim = c(34, 48))
+ 
+ 
+ 
+```
+ 
+ 
+ 
+ 
+\newpage
+ 
+### Visual Covariate Analysis
+ 
+Firstly the correlations between key demographic covariates were analysed (see Figure 6) and the correlation coefficients calculated. The strongest correlation was observed between serum creatinine and PNA ($R^2$ = 0.52), weight correllated to a lesser extent with the different measures of age ($R^2$ ~ 0.3) and PMA and SCR appear essentially independant ($R^"$ = 0.1).
+ 
+```{r, png, echo=F, fig.width=14, fig.height=10,fig.cap="Demographic Correlations" ,eval=FALSE}
+ 
+#panel.cor <- function(x, y, digits = 2, prefix = "", cex.cor, ...){
+   # usr <- par("usr"); on.exit(par(usr))
+    #par(usr = c(0, 1, 0, 1))
+    #r <- abs(cor(x, y))
+    #txt <- format(c(r, 0.123456789), digits = digits)[1]
+    #txt <- paste0(prefix, txt)
+    #if(missing(cex.cor)) cex.cor <- 0.8/strwidth(txt)
+    #text(0.5, 0.5, txt, cex = 2)#cex.cor * r)
+  #}
+#WT <- demographics$WT ; PNA <- demographics$PNADAYS2 ; PMA <- demographics$PMAWEEKS
+# SCR <- demographics$SCR
+ 
+#pairs(~ WT + PNA, lower.panel = panel.smooth, upper.panel = panel.cor)
+#pairs(~ WT + PMA, lower.panel = panel.smooth, upper.panel = panel.cor)
+#pairs(~ PNA + SCR, lower.panel = panel.smooth, upper.panel = panel.cor)
+#pairs(~ PMA + SCR, lower.panel = panel.smooth, upper.panel = panel.cor)
+#pairs(~ PNA + PMA, lower.panel = panel.smooth, upper.panel = panel.cor)
+#pairs(~ WT + SCR, lower.panel = panel.smooth, upper.panel = panel.cor)
+ 
+ 
+include_graphics("/home/zoe/Documents/Fosfomycin_Project/PK_Report/06May/wk20/modelling190520/Rplot.png")
+ 
+ 
+```
+ 
+ 
+Secondly using the individual parameter estimates for CL, Vc and F from Run12 relationships with the observed/measured covariate data have been visually explored.
+ 
+Figure 7 compares the baseline biochemistry data for AST,ALP and ALT (known markers of liver function) with serum creatinine (marker for passive renal filtration) with the estimated individual clearances.  No curve fitting has been performed but visually the most significant relationship between SCR and CL therefore this will be explored in the model (see Section 4.4).
+ 
+Figure 8 evaluates the relationships between age and weight and clearance and with respect to weight and PNA the baseline covariate data has been evaluated. As would be expected relationships exist with PMA, PNA, WT and also potentially GA. The effects of PMA, PNA and WT were selected for evaluated in the model. Unfortunately the density of the PNA age is heavily skewed to <7.5days old.
+ 
+While the hope was to explore the impact of the demographics on absorption rate, specifically in relation to PNA and the changes in the gastric pH environment in the first few days of life this was not possible, due to the oral PK data not supporting estimation of IIV on Ka. Acknowledging that any impact of changes to the gastric environment is more likely to manifest in variability in the rate of absorption (Ka) rather than the extent of absorption for which F% is considered a surrogate (minimal first pass extraction of fosfomycin) the relationship between the population demographics and F% was investigated and is summarised in Figure 9, however no trend was observed.
+ 
+Finally the impact of age and weight on the estimated individual variability in the central volume was assessed, see Figure 10. As illustrated in Figure 8 the need to allometrically scale (weight scaling) the clearance and distribution terms in the model even with such a narrow age/wt range population is still very clear. The relationship with sodium was also explored but no trend was observed.
+ 
+\newpage
+ 
+```{r, echo=F, covariates3, fig.cap="Biochemistry versus Clearance Relationships" , out.extra='', fig.width = 7, fig.height = 8, warning=F,eval=FALSE}
+ 
+COV <-  read.csv("Covariates190517.csv", header = T, stringsAsFactors = F)
+COV <- subset(COV, Day == 0)
+COV <- COV[,c("ID","AST","ALP","ALT")]
+patab12 <- read.csv("patab12.csv", header = T, stringsAsFactors = F)
+# remove duplicate ID's from patab.csv
+patab12 <- patab12[!duplicated(patab12$ID),]
+ 
+ 
+patab12.demo <- cbind(demographics, patab12, COV)
+patab12.demo2 <- patab12.demo[,-10]
+ 
+a <- patab12.demo2 %>%
+  ggplot(aes(x=ALP, y=CL)) +  geom_point() +
+  theme_bw() + 
+  labs(x=expression(paste("ALP (",mu,"mol/L)")),
+       y='CL (L/hr)')
+ 
+b <- patab12.demo2 %>%
+  ggplot(aes(x=AST, y=CL)) +  geom_point() +
+  theme_bw() + 
+  labs(x=expression(paste("AST (",mu,"mol/L)")),
+       y='CL (L/hr)')
+ 
+ 
+c <- patab12.demo2 %>%
+  ggplot(aes(x=ALT, y=CL)) +  geom_point() +
+  theme_bw() + 
+  labs(x=expression(paste("ALT (",mu,"mol/L)")),
+       y='CL (L/hr)')
+ 
+d <- patab12.demo2 %>%
+  ggplot(aes(x=SCR, y=CL)) +  geom_point() +
+  theme_bw() + 
+  labs(x=expression(paste("Serum Creatinine (",mu,"mol/L)")),
+       y='CL (L/hr)')
+ 
+ 
+grid.arrange(a,b,c,d )
+ 
+```
+ 
+```{r, echo=F, covariates4, fig.cap="Demographics versus Clearance Relationships" , out.extra='', fig.width = 7, fig.height = 8,eval=FALSE}
+ 
+#theme(plot.margin=unit(c(1,-0.5,1,1), "cm"))
+ 
+e <- patab12.demo2 %>%
+  ggplot(aes(x=GA, y=CL)) +  geom_point() +
+  theme_bw() + 
+  labs(x='GA (wks)',
+       y='CL (L/hr)')
+       
+ 
+ 
+f <- patab12.demo2 %>%
+  ggplot(aes(x=PNADAYS, y=CL)) +  geom_point() +
+  theme_bw() + 
+  labs(x='PNA (days)',
+       y='CL (L/hr)')
+ 
+ 
+g <- patab12.demo2 %>%
+  ggplot(aes(x=PMAWEEKS, y=CL)) +  geom_point() +
+  theme_bw() + 
+  labs(x='PMA (wks)',
+       y='CL (L/hr)')
+ 
+h<- patab12.demo2 %>%
+  ggplot(aes(x=WT, y=CL)) +  geom_point() +
+  theme_bw() + 
+  labs(x= 'Weight (grams)',
+       y='CL (L/hr)')
+ 
+ 
+ 
+grid.arrange(e,f,g,h )
+ 
+```
+ 
+```{r, echo=F, covariates5, fig.cap="Demographics versus Biavailiability Relationships" , out.extra='', fig.width = 7, fig.height = 8,eval=FALSE}
+ 
+#theme(plot.margin=unit(c(1,-0.5,1,1), "cm"))
+ 
+i <- patab12.demo2 %>%
+  ggplot(aes(x=GA, y=F1)) +  geom_point() +
+  theme_bw() + 
+  labs(x='GA (wks)',
+       y='F (%)')
+       
+ 
+ 
+j <- patab12.demo2 %>%
+  ggplot(aes(x=PNADAYS, y=F1)) +  geom_point() +
+  theme_bw() + 
+  labs(x='PNA (days)',
+       y='F (%)')
+ 
+ 
+k <- patab12.demo2 %>%
+  ggplot(aes(x=PMAWEEKS, y=F1)) +  geom_point() +
+  theme_bw() + 
+  labs(x='PMA (wks)',
+       y='F(%)')
+ 
+l<- patab12.demo2 %>%
+  ggplot(aes(x=WT, y=F1)) +  geom_point() +
+  theme_bw() + 
+  labs(x= 'Weight (grams)',
+       y='F (%)')
+ 
+ 
+ 
+grid.arrange(i,j,k,l )
+ 
+```
+ 
+```{r, echo=F, covariates6, fig.cap="Demographics versus Central Volume Relationships" , out.extra='', fig.width = 7, fig.height = 8,eval=FALSE}
+ 
+#theme(plot.margin=unit(c(1,-0.5,1,1), "cm"))
+ 
+m <- patab12.demo2 %>%
+  ggplot(aes(x=Na, y=V2)) +  geom_point() +
+  theme_bw() + 
+  labs(x='Sodium (micromol/L)',
+       y='Central Volume (L)')
+       
+ 
+n <- patab12.demo2 %>%
+  ggplot(aes(x=PNADAYS, y=V2)) +  geom_point() +
+  theme_bw() + 
+  labs(x='PNA (days)',
+       y='Central Volume (L)')
+ 
+ 
+o <- patab12.demo2 %>%
+  ggplot(aes(x=PMAWEEKS, y=V2)) +  geom_point() +
+  theme_bw() + 
+  labs(x='PMA (wks)',
+       y='Central Volume (L)')
+ 
+p<- patab12.demo2 %>%
+  ggplot(aes(x=WT, y=V2)) +  geom_point() +
+  theme_bw() + 
+  labs(x= 'Weight (grams)',
+       y='Central Volume (L)')
+ 
+ 
+ 
+grid.arrange(m,n,o,p )
+ 
+```
+ 
+\newpage
+### Covariate Modelling
+ 
+Based on the visual covariate analysis in Section 4.2.2 The covariates selected for evaluation in the model were; WT, PMA, PNA and SCR.
+ 
+#### Covariate Modelling - Weight
+ 
+Weight (WT) scalling (allometry) was added to all clearance and volume terms within the model, on CL and Q a fixed exponent of 0.75 was employed while no exponent was employed in the V2 or V3 scaling. The scaling was performed relative to a assumed adult body weight of 70Kg therefore model estimated clearance and volume terms are increased accordingly. Because the decision was made to fix the exponent on CL to 0.75 inclusion of allometric scaling into the model does not add any additional THETAs to the model.
+\begin{equation}
+CL = CL_{std}\times\left(\frac{WT}{70}\right)^{0.75}
+\end{equation}
+\begin{equation}
+V = V_{std}\times\left(\frac{WT}{70}\right)
+\end{equation}
+ 
+#### Covariate Modelling - Maturation (MAT)
+ 
+Fosfomycin is predominantly cleared by passive renal filtration therefore high level renal maturation is incorporated using the model proposed by [@Rhodin2009] Due to the narrow age range of the population in the Neo-Fosfo study parameters for the Hill exponent and time to 50% maturation ($PMA^{Hill}_{50}$) will be fixed to those obtained  previously by [@Rhodin2009].  Again inclusion of this maturation function with fixed estimates of the Hill exponent and time to 50% maturation ($PMA^{Hill}_{50}$) means no additional THETAS are being added to the model.
+ 
+\begin{equation}
+maturation = \frac{PMA^{Hill}}{PMA^{Hill}_{50}+PMA^{Hill}}
+\end{equation}
+ 
+\begin{equation}
+maturation = \frac{PMA^{3.4}}{47.7+PMA^{3.4}}
+\end{equation}
+ 
+#### Covariate Modelling  - Postnatal Age (PNA)
+ 
+While the Rhodin maturation function allows broad development of renal maturation over the first years of life to be captured we have seen a strong relationship with CL and PNA (see Figure 8) therefore the following model ${PNA}_{function}$ was evaluated to try and capture the increases in renal function over the first few days/weeks of life. This model adds two additional parameters for estimation to the model, ${\theta}_{M}$; fraction of clearance on the first day of life, which in this model is set to day = 0, and ${\theta}_{N}$ which represents that rate of short-term maturation post birth.
+ 
+ 
+\begin{equation}
+{PNA}_{function} = {\theta}_{M}+(1-{\theta}_{M})\times(1- e^{-PNA\:\times\:{\theta}_{N}})
+\end{equation}
+ 
+#### Covariate Modelling - Serum Creatinine (SCR)
+ 
+As with PNA we saw in Figure 7 a relationship between an individual subjects clearance and thier measured SCR.  Previously [@Ceriotti2008] published a model that described the changes in endogenous and maternal creatinine concentrations with age allowing a typical age expected concentration of serum creatinine (TSCr) to be calculated as shown in equation 6.  In Figure 11 the measured baseline serum creatinine concentrations (SCR) from the Neo-fosfo population are compared to the typical age expected concentrations reported by Ceriotti (TSCR). In this approach PNA is expressed in years and the first day of life set to day = 1.
+ 
+\begin{equation}
+TSCR({\mu}mol) = -2.37330 - 12.91367\times{ln}_{({PNA}_{years})}+23.93581\times{({PNA}_{years})}^{0.5}
+\end{equation}
+ 
+ 
+```{r, Cov3, fig.cap="Measured Baseline SCR levels compared to Ceriotti TSCR", out.width="70%",fig.align='center', echo=FALSE, out.extra='',eval=FALSE}
+ 
+ 
+PNA<-demographics$PNADAYS/365.25 ### PNA when first day of life = 1
+plot(demographics$SCR~PNA,
+     ylab = "Serum Creatinine at Baseline (micromol/L)",
+     xlab = "PNA (years) when first day of life = 1")
+ 
+Agey<-c(0:40)
+Agey<-Agey/365.25
+ 
+y<--2.37330-12.91367*log(Agey)+23.93581*(Agey)**0.5
+# TSCR (typical serum creatinine) is y when Agey is the observed PNA in years
+# TSCR <- -2.37330-12.91367*log(PNAYEARS)+2.393581*(PNAYEARS)**0.5 ## from cereotti paper
+lines(y~Agey)
+text(x=0.035, y=51.0,label="TSCR")
+```
+ 
+Within the model the possible influence of serum creatinine on clearance will be tested according to equation 8, where the measured serum creatinine concentration (SCR) is standardized using the calculated typical serum concentration (TSCR) (equation 7) and departures from it estimated through ($\theta_{SCr}$). This function introduces a single additional ${\theta}$ into the overall model.
+ 
+ 
+\begin{equation}
+{SCR}_{function} = {\frac{SCR}{TSCR}}^{{\theta}_{SCr}}
+\end{equation}
+ 
+ 
+The run details (Table 10) and parameter estimates (Table 11) associated with the covariate modelling are summarised below . Inclusion of allometric scaling (R29 - WT) and a long-term maturation function (R32 - PMA) show a significant reduction in the OFV without the need for estimation of any additional parameters. These two covariates were then carried forward and SCR and PNA were also tested. Inclusion of SCR (R34) requires estimation of one additional theta but even so no reduction (compared to R32) in OFV is observed. However a further significant reduction in OFV (p value < 0.01) is achieved by inclusion of PNA as a covariate and as such R33 has been selected as the *Final* model.
+ 
+ 
+```{r nonmem7, echo=FALSE,eval=FALSE}
+setwd("/home/zoe/Documents/Fosfomycin_Project/PK_Report/06May/wk20/modelling190520")
+Run <- 12
+Description <- "Base Model - Run12"
+Data <- "190520f.csv "
+Data_excluded <-  "none"
+OFV <- nonmem.ofv(12)
+cov.step <- "yes"
+Min.Succes <- "yes"
+zero.grads <- "no"
+ 
+#
+Run <- c(Run, 29)
+Description <- c(Description , "Base Model + Allometry")
+Data <- c(Data, "190520f.csv ")
+Data_excluded <- c(Data_excluded, "none")
+OFV <- c(OFV, nonmem.ofv(29))
+cov.step <- c(cov.step, "yes")
+Min.Succes <- c(Min.Succes, "yes")
+zero.grads <- c(zero.grads,"no")
+ 
+Run <- c(Run, 32)
+Description <- c(Description , "Base Model + Allometry + MAT")
+Data <- c(Data, "190520f.csv ")
+Data_excluded <- c(Data_excluded, "none")
+OFV <- c(OFV, nonmem.ofv(32))
+cov.step <- c(cov.step, "yes")
+Min.Succes <- c(Min.Succes, "yes")
+zero.grads <- c(zero.grads,"no")
+#
+ 
+Run <- c(Run, 33)
+Description <- c(Description , "Base + Allom + MAT + PNA")
+Data <- c(Data, "190520f.csv ")
+Data_excluded <- c(Data_excluded, "none")
+OFV <- c(OFV, nonmem.ofv(33))
+cov.step <- c(cov.step, "yes")
+Min.Succes <- c(Min.Succes, "yes")
+zero.grads <- c(zero.grads,"no")
+ 
+Run <- c(Run, 34)
+Description <- c(Description , "Base + Allom + MAT + SCR")
+Data <- c(Data, "190520f.csv ")
+Data_excluded <- c(Data_excluded, "none")
+OFV <- c(OFV, nonmem.ofv(34))
+cov.step <- c(cov.step, "yes")
+Min.Succes <- c(Min.Succes, "yes")
+zero.grads <- c(zero.grads,"no")
+ 
+ 
+d.tab7 <- data.frame(Run,Description, OFV, cov.step,Min.Succes,zero.grads)
+ 
+kable(d.tab7, caption = "Covariate Model Development", digits=1,"latex", booktabs = T) %>% kable_styling(latex_options =c("hold_position"))
+ 
+# Pilot is not now significant:
+#paste("p =",round(1- pchisq(nonmem..ofv(1)-nonmem..ofv(2),1),5)) ## last number is the number of digits, number before is??
+ 
+# Allom + MAT versusu Allom + MAT + PNA
+paste("p =", 1- pchisq(nonmem..ofv(32)-nonmem..ofv(33),df = 2)) # second OFV is the lower one
+ 
+ 
+# Allom + MAT versusu Allom + MAT + SCR
+#paste("p =", 1- pchisq(nonmem..ofv(32)-nonmem..ofv(34),df = 1)) # second OFV is the lower one
+ 
+```
+ 
+ 
+```{r nonmem8, echo=FALSE,,eval=FALSE}
+setwd("/home/zoe/Documents/Fosfomycin_Project/PK_Report/06May/wk20/modelling190520")
+#
+Run8 <- 12
+Description8 <- ""
+OFV8 <- nonmem.ofv(12)
+parm8<-nonmem.param(12)
+CL8<-parm8$THETA1
+V28<-parm8$THETA2
+Q8<-parm8$THETA3
+V38<-parm8$THETA4
+KA8<-parm8$THETA5
+F18<-parm8$THETA6*100
+THETA7 <- as.numeric(NA)
+THETA8 <- as.numeric(NA)
+#THETA8 <- c(THETA8, parm8$THETA8)
+#THETA8 <- as.numeric(NA)
+IIV_CL8<-sqrt(parm8$OMEGA.1.1.)*100
+IIV_V28<-sqrt(parm8$OMEGA.2.2.)*100
+IIV_F18<-parm8$OMEGA.6.6.
+Prop.Err8<-sqrt(parm8$SIGMA.2.2.)*100
+#
+Run8 <- c(Run8,29)
+Description8 <- c(Description8,"")
+OFV8 <- c(OFV8,nonmem.ofv(29))
+parm8<- nonmem.param(29)
+CL8<-c(CL8,parm8$THETA1)
+V28<-c(V28,parm8$THETA2)
+Q8<-c(Q8, parm8$THETA3)
+V38<-c(V38, parm8$THETA4)
+KA8<-c(KA8, parm8$THETA5)
+F18<-c(F18, parm8$THETA6*100)
+THETA7 <- c(THETA7, as.numeric(NA))
+THETA8 <- c(THETA8, as.numeric(NA))
+IIV_CL8<-c(IIV_CL8, (sqrt(parm8$OMEGA.1.1.)*100))
+IIV_V28<-c(IIV_V28, (sqrt(parm8$OMEGA.2.2.)*100))
+IIV_F18<-c(IIV_F18, parm8$OMEGA.6.6.)
+Prop.Err8<-c(Prop.Err8, (sqrt(parm8$SIGMA.2.2.)*100) )
+ 
+Run8 <- c(Run8,32)
+Description8 <- c(Description8,"")
+OFV8 <- c(OFV8,nonmem.ofv(32))
+parm8<- nonmem.param(32)
+CL8<-c(CL8,parm8$THETA1)
+V28<-c(V28,parm8$THETA2)
+Q8<-c(Q8, parm8$THETA3)
+V38<-c(V38, parm8$THETA4)
+KA8<-c(KA8, parm8$THETA5)
+F18<-c(F18, parm8$THETA6*100)
+THETA7 <- c(THETA7, as.numeric(NA))
+THETA8 <- c(THETA8, as.numeric(NA))
+IIV_CL8<-c(IIV_CL8, (sqrt(parm8$OMEGA.1.1.)*100))
+IIV_V28<-c(IIV_V28, (sqrt(parm8$OMEGA.2.2.)*100))
+IIV_F18<-c(IIV_F18, parm8$OMEGA.6.6.)
+Prop.Err8<-c(Prop.Err8, (sqrt(parm8$SIGMA.2.2.)*100) )
+ 
+Run8 <- c(Run8,33)
+Description8 <- c(Description8,"")
+OFV8 <- c(OFV8,nonmem.ofv(33))
+parm8<- nonmem.param(33)
+CL8<-c(CL8,parm8$THETA1)
+V28<-c(V28,parm8$THETA2)
+Q8<-c(Q8, parm8$THETA3)
+V38<-c(V38, parm8$THETA4)
+KA8<-c(KA8, parm8$THETA5)
+F18<-c(F18, parm8$THETA6*100)
+THETA7 <- c(THETA7, parm8$THETA7)
+THETA8 <- c(THETA8, parm8$THETA8)
+IIV_CL8<-c(IIV_CL8, (sqrt(parm8$OMEGA.1.1.)*100))
+IIV_V28<-c(IIV_V28, (sqrt(parm8$OMEGA.2.2.)*100))
+IIV_F18<-c(IIV_F18, parm8$OMEGA.6.6.)
+Prop.Err8<-c(Prop.Err8, (sqrt(parm8$SIGMA.2.2.)*100) )
+ 
+Run8 <- c(Run8,34)
+Description8 <- c(Description8,"")
+OFV8 <- c(OFV8,nonmem.ofv(34))
+parm8<- nonmem.param(34)
+CL8<-c(CL8,parm8$THETA1)
+V28<-c(V28,parm8$THETA2)
+Q8<-c(Q8, parm8$THETA3)
+V38<-c(V38, parm8$THETA4)
+KA8<-c(KA8, parm8$THETA5)
+F18<-c(F18, parm8$THETA6*100)
+THETA7 <- c(THETA7, parm8$THETA7)
+THETA8 <- c(THETA8, as.numeric(NA))
+IIV_CL8<-c(IIV_CL8, (sqrt(parm8$OMEGA.1.1.)*100))
+IIV_V28<-c(IIV_V28, (sqrt(parm8$OMEGA.2.2.)*100))
+IIV_F18<-c(IIV_F18, parm8$OMEGA.6.6.)
+Prop.Err8<-c(Prop.Err8, (sqrt(parm8$SIGMA.2.2.)*100) )
+ 
+ 
+d.tab8 <- data.frame(Run8, OFV8, CL8, V28,Q8,V38, KA8, F18, IIV_CL8, IIV_V28, IIV_F18, Prop.Err8, THETA7, THETA8)
+ 
+colnames(d.tab8) <- c("Run", "OFV", "CL(L/hr)", "Vc(L)", "Q(L/hr)","Vp(L)","KA(/hr)", "F1(%)", "IIV CL(%)", "IIV Vc(%)", "IIV F1", "Prop Error(%)", "THETA7", "THETA8")
+ 
+ 
+kable(d.tab8, digits = c(0,0,2,2,2,2,2,2,2,2,2,1,2,2),linesep = "", caption = "Parameter Estimates from Covariate Model Development", "latex", booktabs = T) %>% kable_styling(latex_options =c("hold_position", "scale_down"))%>% footnote(number = c("IIV on F% is reported directly as the OMEGA value"))
+ 
+ 
+```
+ 
+ 
+ 
+# Final Model
+ 
+Parameter and inter-individual variability estimates along with thier associated relative standard errors (%RSE) for the *Final* Model (Run33) are summarised in Table 12.
+ 
+The PNA function estimated in the final model is visualised in Figure 12, where THETA7 = ${\theta}_{M}$; fraction of clearance on the first day of life and THETA8 = ${\theta}_{N}$ the rate of short-term maturation post birth.
+ 
+Key diagnostic plots; GOF, VPC and iplots and presented in Figures 13, 14 and 15 respectivley.
+ 
+```{r, RSE1, fig.cap="Final Model Parameters (Run33) and %RSE", echo=FALSE,out.extra='',eval=FALSE}
+nonmem..RSE(33)
+```
+ 
+```{r, echo=F, fig.cap="Estimated PNA Function", out.width="70%",fig.align='center', echo=FALSE, out.extra='',eval=FALSE}
+ 
+ 
+#can visualise also your PNA function:
+pna <- 0:30
+mf <- 0.45 + (1 - 0.45) * (1 - exp(- pna * 0.12))
+plot(pna, mf, type = "l", xlab = "PNA (days)", ylab = "Short-Term Maturation")
+ 
+```
+ 
+```{r gof3, fig.cap="GOF - Final Model - Run33", fig.width=10, fig.height=7, echo=FALSE, out.extra='',eval=FALSE}
+nonmem..gof(33)
+```
+ 
+```{r VPC2, fig.cap="VPC - Final Model - Run33", fig.width=10, fig.height=5,echo=FALSE, out.extra='',eval=FALSE}
+ 
+library(xpose4)
+cex.n <- 1 ; cex.pt <- 0.7
+ 
+vpc.std <- xpose.VPC(vpc.info = "./run33VPC/vpc_results.csv", by = "ROUTE", # IV = 1, PO =2,
+                     vpctab = "./run33VPC/vpctab33",
+                     PI.ci.area.smooth=T,                  
+                     PI.ci.med.arcol=grey(0.5),PI.ci.up.arcol=grey(0.5),
+                     PI.ci.down.arcol=grey(0.5),
+                     PI.real.med.col="black",#logy=T,
+                     PI.real.up.col="black",PI.real.down.col="black",
+                     pch=16,col=grey(0.3),cex=cex.pt,main="",
+                     xlb=list(label="Time after dose (h)",cex=cex.n),
+                     ylb=list(label="Concentration (mg/L)",cex=cex.n),
+                     xlab.top=list(label="Visual predictive check",cex=cex.n))
+vpc.std
+ 
+```
+ 
+ 
+\newpage
+ 
+```{r iplot2, fig.cap="iplot - Final Model - Run33", fig.width=9, fig.height=13, echo=FALSE, out.extra='',eval=FALSE}
+nonmem..iplot(33)
+```
+ 
+# Conclusions and Future Work
+ 
+A 2-compartmental PK model with standard allometric and PMA scaling plus additional PNA scaling gives a good fit to the Neo-Fosfo PK data and supports estimation of inter-subject variability on CL, Vc and F%. No additional model improvment was found through inclusion of creatinine as a covariate which is likely due to the measured concentration being high as a result of passed on maternal levels rather than as an indicator of low renal function/clearance.
+ 
+Having established the PK model it can now be used in simulation mode to evaluate different dosing regimens and inform study design questions. Key decisions are still to be made regarding the target; ($fT>MIC$) as [@Traumuller2011] used in 2011 or whether other measures e.g. AUC>MIC are also important?
+ 
+Within the NeoFosfo study team a breakpoint of 32 $\mu$g/mL along with a higher susceptibility cut-off of 64 $\mu$g/mL have been discussed and it maybe that both are evaluated as part of the target attainment simulations.
+ 
+Fnally there is also a desire to evaluate and potentially incorporate a CSF compartment into the model proposed here, work on this will begin shortly.
+ 
+ 
+#References
