@@ -1,0 +1,73 @@
+---
+title: "time_series"
+output: 
+  pdf_document:
+      number_sections: TRUE
+      toc: TRUE
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+# Read Time Series Date
+* scan() : read data into a vector or list from the console or file
+* ts() : store the data into time series format
+```{r}
+# alt+ctrl+i = create a new code chunk
+# import data
+kings <- scan("http://robjhyndman.com/tsdldata/misc/kings.dat",skip=3)
+kings
+# store the data in a time series object 
+# ts(), frequency = 'the time interval data collected', such as 12 for montly, 4 for quarter
+# start(1982,2) = the data start from 1982 second quarter
+kingstimeseries <- ts(kings)
+kingstimeseries
+```
+```{r}
+# the example of advanced use 
+births <- scan("http://robjhyndman.com/tsdldata/data/nybirths.dat")
+births.ts <- ts(births, frequency = 12,start = c(1946,1))
+births.ts
+```
+# Plotting Time Series
+* addictive model : be able to decribe seasonal data but trend
+    * trend data can be transformed into log to decrease the trend effect.
+
+
+```{r}
+plot.ts(kingstimeseries)
+```
+
+# Decomposing Time Series
+* to separat the data into its constituent components
+ 
+## Decomposing Non-Seasonal Date
+* a non-seasonal time series consists of **a trend component** and **an irregular component**
+* to estimate the trend component of a non-seasonal time series that can be described using an additive model : a smoothing mothod, such as MA.
+* SMA() : 
+    * in "TTR" package
+    * is used to smooth time series data, a simple moving average
+    * specify the order of the simple moving average, n
+        * to estimate the trend componet, might try smoothing the data with a simple moving average of a higher order
+        * trial-and-error
+```{r}
+library(TTR)
+kingstimeseriesSMA3 <- SMA(kingstimeseries, n=3)
+plot.ts(kingstimeseriesSMA3)
+```
+
+## Decomposing Seasonal Date
+* a seasonal data consists of **a trend component**, **a seasonal component** and **an irregular component**.
+* to estimate the trend component and seasonal component, using additive model
+    * decompose() : decompose a time series into **seasonal**, **trend** and **irregular components**, using moving averages. 
+        * return a list object
+```{r}
+births.ts.decom <- decompose(births.ts)
+plot(births.ts.decom)
+```
+
+## Seasonally Adjusting 
+
+
+* 

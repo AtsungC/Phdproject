@@ -4,16 +4,18 @@ author: 'Hsin Chen'
 output: 
     pdf_document:
         number_section: TRUE
+        toc: TRUE
 ---
 
 # 240420
 * time serie :
     1. Holt-Winters model
+        *
     2. ARIMA model
     3. Spectral density
 * Rmarkdown :
     1. eval=F : mute the code because there is no datasheet attached
-    2. MacTex : Mac version of LaTeX, a document preparation sysrem for high-qualiy typsetting and can be used for publishing
+    2. **MacTex** : Mac version of LaTeX, a document preparation sysrem for high-qualiy typsetting and can be used for publishing
         * output = pdf_document : the LaTeX is required
         * toc : table of contents
         * toc_depth : the wideth of the toc, deflaut =2(pdf),3(html)
