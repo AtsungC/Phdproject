@@ -7,7 +7,7 @@ output:
 ---
 
 ```{r setup, include=FALSE}
-knitr::opts_chunk$set(echo = TRUE)
+knitr::opts_chunk$set(echo = TRUE,cache = TRUE)
 ```
 
 # Read Time Series Date
@@ -28,7 +28,7 @@ kingstimeseries
 # the example of advanced use 
 births <- scan("http://robjhyndman.com/tsdldata/data/nybirths.dat")
 births.ts <- ts(births, frequency = 12,start = c(1946,1))
-births.ts
+knitr::kable(head(births.ts),'markdown')
 ```
 # Plotting Time Series
 * addictive model : be able to decribe seasonal data but trend
@@ -49,8 +49,8 @@ plot.ts(kingstimeseries)
     * in "TTR" package
     * is used to smooth time series data, a simple moving average
     * specify the order of the simple moving average, n
-        * to estimate the trend componet, might try smoothing the data with a simple moving average of a higher order
-        * trial-and-error
+         * to estimate the trend componet, might try smoothing the data with a simple moving average of a higher order
+         * trial-and-error
 ```{r}
 library(TTR)
 kingstimeseriesSMA3 <- SMA(kingstimeseries, n=3)
@@ -68,6 +68,55 @@ plot(births.ts.decom)
 ```
 
 ## Seasonally Adjusting 
+* if the seasonal time series can be described by an additive model, the data can be seasonally adjusted by estimating the seasonal component and substracting the estmated seasonal component from the original time series. 
+* the seasonally adjusted result just contains **the trend component** and **an irregular component*
+* decompose() 
+```{r}
+births.ts.decom.seasonallyadjusted <- births.ts - births.ts.decom$seasonal
+plot(births.ts.decom.seasonallyadjusted)
+```
+
+# Forecasts using Exponential Smoothing
+* being used to make short-time forecasts for time series data
+
+## Simple Exponential Smoothing
+* if the data can be described using an additice model with **constant level** and **no seasonality**
+* using simple exponential smoothing to make short-time forcasts
+* alpha : lies between 0 and 1
+    * close to 0 : meaning little weight is placed on the most recent observations when making forecasts of future values
+* HoltWinters() : simple exponential smoothing 
+    * beta = FALSE ; gamma = FALSE : for Holt's exponential smoothing or Holt-Winters exponential smoothing 
+    * **fitted** : the forcasts made by HoltWinters is stored in fitted
+    
+```{r}
+rain <- scan("http://robjhyndman.com/tsdldata/hurst/precip1.dat",skip=1)
+rain.ts <- ts(rain,start = 1813)
+plot.ts(rain.ts)
+```
+
+```{r}
+rain.ts.forcast <- HoltWinters(rain.ts,beta=FALSE,gamma=FALSE)
+knitr::kable(head(rain.ts.forcast$fitted))
+plot(rain.ts.forcast)
+```
+
+* the accuracy offorcasting : the sum of squared errors  
+    * $SSE 
+
+## Specifiy the inital value for the level in the HW model
+* l.start 
+
+## forecast.HoltWinters() 
+* make forecast for further time point
+* *forecast* package
+* h : how many further time points going to make forecast
+**forecast.HoltWinter() could not find in the package**
+**stats::forecast.HoltWinters() is not availibale for R 4.0**
+**forecast::forecast() has the same function**
+```{r message=FALSE}
+require('forecast')
+rain.ts.forcast2 <- forecast::forecast(rain.ts.forcast, h=8)
+knitr::kable(rain.ts.forcast2,'markdown')
+```
 
 
-* 
