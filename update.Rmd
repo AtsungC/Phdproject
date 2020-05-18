@@ -1,0 +1,62 @@
+---
+title: "Update"
+author: "Hsin"
+date: "18/05/2020"
+output: 
+  pdf_document:
+    toc: TRUE
+    number_sections: TRUE
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+# Rmarkdown  
+* [Rmarkdown](https://bookdown.org/yihui/rmarkdown/websites.html)
+* *tidyverse*
+* *ggplot2*
+* [*spectrum* ](http://web.stanford.edu/class/earthsys214/notes/series.html)
+    * spans (similar to exponential parameter)
+* bookdown
+* [oxfordown](https://github.com/ulyngs/oxforddown)
+* blogdown : 
+    * [netlify](https://www.netlify.com) 
+    * templates : [hugo](https://gohugo.io/templates/)
+
+# Git/Github  
+* basic commands : 
+    * be able to push the log to the github
+    * be able to restore the previous version of file (whole file or a specific scrip)
+* apply the object tracking application from github
+    * [**pathtrackr**](https://github.com/aharmer/pathtrackr)
+
+# Python  
+* basic commands : 
+    * numpy : data handling
+* apply the animal tracking application from github
+    * [**DeepLabCut**](https://github.com/AlexEMG/DeepLabCut)
+
+# Linux
+* basic environment commands
+* google cloud : [**cloud computing**](https://cloud.google.com)
+    
+# Time series 
+* Time series concept
+    * Youtube channel : [**ritvkmath**](https://www.youtube.com/channel/UCUcpVoi5KkJmnE3bvEhHR0Q)
+* Time series in r 
+    * [**a little Book of R for Time Series**](https://a-little-book-of-r-for-time-series.readthedocs.io/en/latest/index.html)
+    
+# Last meeting 
+* Holt-Winters model
+* [ARIMA model](https://otexts.com/fpp2/arima-r.html)
+
+* vector autogression : multuple variables
+
+
+
+
+
+    
+
+    

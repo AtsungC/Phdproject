@@ -7,11 +7,11 @@ output:
 ---
 
 ```{r setup, include=FALSE}
-knitr::opts_chunk$set(echo = FALSE,message = FALSE) # global setting 
+knitr::opts_chunk$set(echo = FALSE,message = FALSE,cache=TRUE) # global setting 
 knitr::clean_cache()
  library(readxl)
  library(stringr)
- library(ggplot2)
+ library(ggplot2) #try to create graphs 
  library(gganimate)
  library(lubridate)
  library(tidyverse)
