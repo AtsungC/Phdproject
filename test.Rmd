@@ -1,10 +1,14 @@
 ---
 title: "Statistical learning on Mice moverment"
-output: github_document
+output: 
+    pdf_document:
+      toc: TRUE
+      number_sections: TRUE
 ---
 
 ```{r setup, include=FALSE}
 knitr::opts_chunk$set(echo = FALSE,message = FALSE) # global setting 
+knitr::clean_cache()
  library(readxl)
  library(stringr)
  library(ggplot2)
@@ -20,16 +24,14 @@ knitr::opts_chunk$set(echo = FALSE,message = FALSE) # global setting
  library(caret)
 ```
 # ML progect introduction
-
 This progect is on animal behavior analysis. The data was retrieved form Catwalk videos which is coordinates of head, centre and tail of a mouse while on gait analysis. An weight-independent variable, $\theta$, was firt introduced into gait analysis. This proof-of-concept project is going to apply relevent variables into machine learning algorithm. The aims are for classification of treatment groups.
 
 
 ## Outline of the proccess
-
 1. Importing data
   * all.mice
   * 
-2. Calculate the rotating angle, ** $\theta$**
+2. Calculate the rotating angle, **$\theta$**
   * Ploting the data
 3. Models bulding
   * Supervised models 
@@ -39,29 +41,21 @@ This progect is on animal behavior analysis. The data was retrieved form Catwalk
     * Multiple regression
     * k-nesrest neighor
     * Desicion tree
-  
-  
-## Importing data
 
+## Importing data
 * The data with coordinates were imported into R.
   * all.mice (function : read.excel.sheet() )
-  
 * The calculation of the $\theta$ 
   * all.mice with theta.T, theta.C (function : angle.calculation.tail() )
-  
 * The average velocity, theta and variety of theta
   * vel.all.micev: 
    mean velocity and mad.Y in head, centre and tail. 
    mean and var of theta.C and theta.T.
-  
 * The interval velocity
   * all.vel.summary:
   vel, mad.Y, in.t (in head, centre and tail)
-  
-
 
 ## all.mice
-
 ```{r import, echo=FALSE, message=FALSE}
 # function for import
 
@@ -86,12 +80,11 @@ all.mice <- all.mice %>%
     ID= str_extract(all.mice$ID.RUN,'[A-Z]{4,5}[0-9]{3}\\.[0-9][a-z]'),
     Group= str_extract(all.mice$ID.RUN,'^[A-Z]+')
   )
-all.mice %>% select(ID,Group,Run,ID.RUN,everything())
-
+all.mice <- all.mice %>% select(ID,Group,Run,ID.RUN,everything())
+knitr::kable(head(all.mice))
 ```
 
 ## all.mice with theta 
-
 ```{r theta  , echo=FALSE,message=FALSE}
 angle.calculation.tail <- function(filename1){
 
@@ -140,11 +133,10 @@ angle.calculation.tail <- function(filename1){
   
 }
 all.mice <- angle.calculation.tail(all.mice)
-head(all.mice)
+knitr::kable(head(all.mice))
 ```
 
 ## vel.all.mice (summary of each run)
-
 ```{r average.velocity,echo=FALSE,message=FALSE,warning=FALSE}
 Average.velocity <- function(filename2){
   points <- c('Head','Centre','Tail')
@@ -183,7 +175,7 @@ Average.velocity <- function(filename2){
 }
 
 Vel.all.mice <- Average.velocity(all.mice)
-head(Vel.all.mice)
+knitr::kable(head(Vel.all.mice))
 ```
 
 ## all.vel.mice (vel in certain interval)
@@ -243,14 +235,11 @@ ex3 <- function(filename){
 }
 
 all.vel.summary <- ex3(all.mice)
-head(all.vel.summary)
+knitr::kable(head(all.vel.summary))
 ```
 
-
 # Plotting 
-
 ## all.mice
-
 ### theta.C
 
 ```{r theta.C plotting, echo=FALSE,warning=FALSE}
@@ -259,17 +248,15 @@ all.mice %>%
   geom_boxplot(aes(fill=Group),alpha=1/2)+
   theme_bw()+
   NULL
-
-all.mice %>%
+all.mice %>% na.omit() %>% 
   ggplot(aes(Group,theta.C))+
   geom_boxplot(aes(fill=ID),alpha=1/2)+
   theme_bw()+
   NULL
 ```
-
 ### theta.T
 
-```{r theta.C plotting, echo=FALSE,warning=FALSE}
+```{r theta.T plotting, echo=FALSE,warning=FALSE}
 all.mice %>% 
   ggplot(aes(Group,theta.T))+
   geom_boxplot(aes(fill=Group),alpha=1/2)+
@@ -287,7 +274,8 @@ all.mice %>%
   NULL
 ```
 
-### theta.C against theta.T
+## theta.C against theta.T
+
 ```{r theta.C against theta.T, echo=FALSE,warning=FALSE}
 all.mice %>% 
   ggplot(aes(theta.C,theta.T))+
@@ -371,6 +359,7 @@ all.vel.summary %>%
   geom_boxplot()+
   geom_point(aes(color=ID))+
   facet_wrap(~Group)+
+  theme_bw()+
 NULL
 all.vel.summary %>% 
   # filter(Group=='WTUT')%>%  
@@ -379,6 +368,7 @@ all.vel.summary %>%
   geom_boxplot()+
   geom_point(aes(color=ID))+
   facet_wrap(~Group)+
+  theme_bw()+
 NULL
 all.vel.summary %>% 
   # filter(Group=='WTUT')%>%  
@@ -387,6 +377,7 @@ all.vel.summary %>%
   geom_boxplot()+
   geom_point(aes(color=ID))+
   facet_wrap(~Group)+
+  theme_bw()+
 NULL
 ```
 

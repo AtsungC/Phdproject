@@ -113,10 +113,89 @@ plot(rain.ts.forcast)
 **forecast.HoltWinter() could not find in the package**
 **stats::forecast.HoltWinters() is not availibale for R 4.0**
 **forecast::forecast() has the same function**
+* the predicted area, 80% and 95% prediction interval
 ```{r message=FALSE}
 require('forecast')
 rain.ts.forcast2 <- forecast::forecast(rain.ts.forcast, h=8)
 knitr::kable(rain.ts.forcast2,'markdown')
+plot(rain.ts.forcast2)
 ```
 
+* if there are correlations between **forecast errors** for **successive predictions**, it is likely that the simple exponential smoothing forecasts could be improved upon by another forecasting technique. 
+* forecast error : a measure of accurancy of the predictive model is SSE, sum of squared error for the **in-sample** forecast errors. it is stored in **residual** of the forecast of HoltWinters. 
+* if the SSE could be improved, the predictive model should be improved as well.
+* acf() : showing a correlogram of the **in-sample** forecast errors, to specifiy the max lag 
+```{r}
+acf(rain.ts.forcast2$residuals,lag.max = 20, na.action=na.pass)
+#na.action=na.pass  to pass the NA data
+```
+* the lag3 is just touching the significance bounds
+* **Ljung-Box text** : to test whether there is significant evidence for non-zero correlations at lags 1-20.
+* Box.test() : Ljung-Box test
+```{r}
+Box.test(rain.ts.forcast2$residuals,lag = 20,type = 'Ljung-Box')
+```
+* the p-value is 0.6, so there is a little evidence of non-zero autocorrelation in the in-sample forecast error at lags1.20.
+* checking the normal distribution with mean zero and constant variance : to be sure that the predictive model cannot be improved upon.
+
+```{r}
+plot.ts(rain.ts.forcast2$residuals)
+```
+* histogtam plotting : to check whether the forecast errors are normally distributed with mean zero.
+```{r}
+plotForecastError <- function(forecasterrors){
+     forecasterrors <- na.omit(forecasterrors)
+  # make a histogram of the forecast errors:
+     mybinsize <- IQR(forecasterrors)/4
+     mysd   <- sd(forecasterrors)
+     mymin  <- min(forecasterrors) - mysd*5
+     mymax  <- max(forecasterrors) + mysd*3
+     # generate normally distributed data with mean 0 and standard deviation mysd
+     mynorm <- rnorm(10000, mean=0, sd=mysd)
+     mymin2 <- min(mynorm)
+     mymax2 <- max(mynorm)
+     if (mymin2 < mymin) { mymin <- mymin2 }
+     if (mymax2 > mymax) { mymax <- mymax2 }
+     # make a red histogram of the forecast errors, with the normally distributed data overlaid:
+     mybins <- seq(mymin, mymax, mybinsize)
+     hist(forecasterrors, col="red", freq=FALSE, breaks=mybins)
+     # freq=FALSE ensures the area under the histogram = 1
+     # generate normally distributed data with mean 0 and standard deviation mysd
+     myhist <- hist(mynorm, plot=FALSE, breaks=mybins)
+     # plot the normal curve as a blue line on top of the histogram of forecast errors:
+     points(myhist$mids, myhist$density, type="l", col="blue", lwd=2)
+}
+plotForecastError(rain.ts.forcast2$residuals)
+```
+
+* the Ljung-Box : little evidence of non-zero autocorrelation
+* the normal distribution with mean zero
+* conclusion : the simple exponential smoothing method provides an adequate predictive model.
+* the 80%-95% predictive intervals are valid
+
+# Holt's Exponential Smoothing
+* the dataset with trend (increasing or decreasing) and no seasonality and can be described by an addictive model. The short-time forecasts can be made by Holt's exponential smoothing.
+* Holt's exponential smooting estimate the level and slope at the current time point. 
+* Smoothing : 
+    * alpha, for the estimate of **the level** at the current time point. 
+    * beta, for the estimate of **the slope of the trend component** at the current point
+```{r}
+skirts <- scan("http://robjhyndman.com/tsdldata/roberts/skirts.dat",skip=5)
+skirts.ts <- ts(skirts,start = 1866)
+plot.ts(skirts.ts)
+```
+
+* HoltWinters(gamma=FALSE) : Holt's exponential smoothing 
+```{r}
+skirts.ts.fc <- HoltWinters(skirts.ts, gamma=FALSE)
+skirts.ts.fc
+skirts.ts.fc$SSE
+plot(skirts.ts.fc)
+```
+* the estimate value of alpha and beta are both high, which mean the current value of the level and of the slop of the trend component are based mostly upon very recent observations in the time series.
+* the SSE is high cause the level and the slop of the time series change a lot over time
+```{r}
+skirts.ts.fc2 <- forecast::forecast(skirts.ts.fc,h=19,na.action=na.pass)
+plot(skirts.ts.fc2)
+```
 
