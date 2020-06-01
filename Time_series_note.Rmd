@@ -199,3 +199,131 @@ skirts.ts.fc2 <- forecast::forecast(skirts.ts.fc,h=19,na.action=na.pass)
 plot(skirts.ts.fc2)
 ```
 
+
+
+# Introductory time series with R 
+* ternary parts : function(n) if (n==1) 1 else n*(n-1)
+* the **matrix calculation** can replace the **loop** and fasten the process
+## Plots, trends, and seasonal variation
+### A flying start : Air passenger bookings
+```{r}
+data(AirPassengers) # it is a time series data 
+AP <- AirPassengers
+class(AP)
+
+start(AP);end(AP);frequency(AP)
+
+plot(AP,ylab="Passengers(1000's)")
+plot(aggregate(AP)) # clear trend feather 
+summary(AP)
+
+#layout(1:2) display graphic for multple graphs
+cycle(AP) # label the frequency 1-12 to each value 
+
+boxplot(AP~cycle(AP))
+```
+
+```{r , eval=F}
+path <- "http://www.massey.ac.nz/~pscowper/ts/Maine.dat"# not found
+Maine.month <- read.table(path,header=T)
+class(Maine.month)
+```
+```{r}
+path <- "http://www.massey.ac.nz/~pscowper/ts/USunemp.dat"
+us.month <- read.table(path,header=T)
+```
+
+* ts- time series
+* zoo- Zeileis's ordered obervations : enhance ts, providing irregular time series
+* xts- eXtensible time series : enhances zoo by adding **metadata** to time-series data
+
+* ts- time series
+    * reguarly spaced time series
+    * cantains **data matrix** and **time vector**
+    * adding and substraction can be performed at common time point at time series
+```{r}
+data <- matrix(c(sin(seq(0,10,0.1)),
+                 sin(seq(1,11,0.1)),
+                 sin(seq(2,12,0.1)),
+                 sin(seq(3,13,0.1))),
+               ncol = 4)
+dim(data)
+thefrequencyofayear <- 12 #monthly, 52=weekly
+name.col <- c('E','W','N','S')
+data.ts <- ts(data,end=2020,frequency=thefrequencyofayear,names=name.col)
+head(data.ts)
+```
+    
+
+*zoo 
+    * compatible with ts
+    * handle **irregularly** spaced time series
+        * ex: stock market reading on different date of a week
+    * index the data 
+        * time search : as.POSIXct('time')
+    * more flexible and applied to other statstical methods
+    * when doing time zone transfer, be careful of **BST** and **GMT**, there is a missing hour.
+    
+```{r}
+library(zoo)
+weatherData <- read.table("https://raw.githubusercontent.com/lyndadotcom/LPO_weatherdata/master/Environmental_Data_Deep_Moor_2012.txt",
+                          header = TRUE, 
+                          stringsAsFactors = FALSE)
+head(weatherData)
+dim(weatherData) # number of columns =9
+zoo.weather <- as.matrix(weatherData[,-(1:2)],ncol=7) # exclude data and time columns
+zoo.weather.datetime <- as.POSIXct(paste(weatherData[,1],weatherData[,2]),"%Y_%m_%d %H:%M:%S",tz='America/Los_Angeles') 
+ts.zoo <- zoo(x=zoo.weather,order.by = zoo.weather.datetime)
+ts.zoo[as.POSIXct('2012-01-01 ')]
+```
+
+*xts 
+    * compatible with zoo
+    * enhanced statistics
+    * attributes
+    * split data in a ragnge of time
+    * can search data in a ragne
+    
+```{r}
+library(xts)
+weatherData <- read.table("https://raw.githubusercontent.com/lyndadotcom/LPO_weatherdata/master/Environmental_Data_Deep_Moor_2012.txt",
+                          header = TRUE,
+                          stringsAsFactors = FALSE)
+zoo.weather <- as.matrix(weatherData[,-(1:2)],ncol=7) # exclude data and time columns
+zoo.weather.datetime <- as.POSIXct(paste(weatherData[,1],weatherData[,2]),"%Y_%m_%d %H:%M:%S",tz='America/Los_Angeles')
+xts.wt <- xts(x=zoo.weather,order.by = zoo.weather.datetime)
+xts.wt.at <- xts(x = zoo.weather, 
+              order.by = zoo.weather.datetime,
+              favoriteAnimal = "rabbit")
+xtsAttributes(xts.wt.at)
+ts.wt.mo <-  splice(xts.wt,f='months')
+
+```
+
+* time series and the tidyverse 
+    * tsibble 
+    * tibbletime
+        * time series data : **dont require conversion to matrix**
+        * similar to ts, zoo and xts
+        * similar functionality
+```{r}
+library(tsibble)
+library(tibbletime)
+library(tidyverse)
+library(lubridate)
+tt_weatherData <- read_table2("https://raw.githubusercontent.com/lyndadotcom/LPO_weatherdata/master/Environmental_Data_Deep_Moor_2012.txt") %>% 
+  unite(datetime, date,time) %>%
+  mutate(datetime = ymd_hms((datetime))) %>%
+  tbl_time(index = datetime)
+
+ts_weatherData <- read_table2("https://raw.githubusercontent.com/lyndadotcom/LPO_weatherdata/master/Environmental_Data_Deep_Moor_2012.txt") %>% 
+  unite(datetime, date,time) %>%
+  mutate(datetime = ymd_hms((datetime))) %>%
+  as_tsibble(index = datetime, key = Air_Temp) 
+
+```
+
+* rolling statistics
+    * roll function
+* time series graphs 
+
