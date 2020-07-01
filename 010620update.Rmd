@@ -1,0 +1,60 @@
+---
+title: "Update"
+author: "Hsin"
+date: "02/06/2020"
+output: ioslides_presentation
+---
+
+
+## Outline
+
+- Life in lockdown
+- Study in lockdown 
+- Experiements after lockdown lifting
+
+
+## Life in lockdown
+
+- Church life : 
+    * 51 donations to local NHS hospitals and hospices : 
+        * 4,300 cover-all 
+        * 319 FFP3/2
+        * 1125 K-N95 
+        * 2,0510 surgical mask etc
+    * church technical manager : 
+        * zoom meeting
+        * youtube channel
+        * video editing, music recording via various programs such final cut pro and logic.
+
+## Life in lockdown
+
+- Study life : 
+    * Nature magazine subscruption
+    * R in statistic and time series :
+        * Introductory time series with R
+        * Statistical analysis with R
+        * Time series analysis and its application
+        * Time series analysis with R
+        * R for data science
+        * Linkedin learning 
+
+## Life 
+
+- North London : Bounds green (near Alexandra Palace)
+- Renovation house
+- Driving lisence in July
+- Simply app : piano learning
+- Shingles 
+
+## Combination therapy experiemnt 
+
+- Completed the URSO group
+- Gene therapy and combination groups
+
+
+
+
+
+
+
+

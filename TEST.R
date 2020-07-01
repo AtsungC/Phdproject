@@ -34,22 +34,25 @@ read.excel.sheet <- function(filename){
   names.sht <- excel_sheets(filename)
   for(i in 1:length(names.sht)) 
   { 
-    ifelse(i==1,T <- read_excel(filename,sheet = 1), T )
-    ifelse(i+1 <= length(names.sht),T2 <- as.data.frame(read_excel(filename,sheet = i+1)),next())
-    T  <- rbind.data.frame(T,T2)
+    if(i==1) T <- read_excel(filename,sheet = 1)
+    if(i+1 <= length(names.sht)) T2 <- read_excel(filename,sheet = i+1)
+    T  <- rbind(T,T2)
   }
   return(T)
 }
-####################################### 
+ 
+
+
+ ####################################### 
 #importing data from excel
-all.mice <-read.excel.sheet('NPCTG.1.xlsx')
+all.mice <-read.excel.sheet('NPCTG1.xlsx')
 
 # check NA and drop_NA
 any(is.na(all.mice))
 which(is.na(all.mice))
 filter(all.mice,is.na(ID))
 dim(all.mice) 
-
+unique(all.mice$ID)
 dim(filter(all.mice,Point=='Centre'))
 
 check <- all.mice %>%  # check the number of data of each run in three points
@@ -86,7 +89,7 @@ angle.calculation.tail <- function(filename1){
   Centre <- filter(filename1, Point == "Centre")
   Tail <-   filter(filename1, Point == "Tail")
   
-  calculation <- Head %>% select(ID.RUN,ID,Run,Group)
+  calculation <- Head %>% select(ID.RUN,ID,Run,Group,Point)
   
   calculation <- calculation %>% 
     mutate(
@@ -107,17 +110,19 @@ angle.calculation.tail <- function(filename1){
       Centre.angel=sign(Head$Y-Centre$Y)*180*(acos(calculation$X.cent.head * calculation$X.cent.horizontal /abs(calculation$X.cent.horizontal) / sqrt((calculation$X.cent.head)^2+(calculation$ Y.cent.head)^2)))/(pi)
     )
   
-  Pts <- c('Head','Centre','Tail')
-  T2 <- data.frame()
-  for (i in Pts) {
-    T <- as.data.frame(eval(parse(text=i)))
-    T <- T %>% 
-      mutate(
-        Tail.theta = calculation$Tail.angel,
-        Centre.theta = calculation$Centre.angel
-      )
-   ifelse(i=='Head',T2 <- T,T2 <- rbind(T2,T))
-  }
+  #Pts <- c('Head','Centre','Tail')
+  #T2 <- data.frame()
+  #for (i in Pts) {
+  #  T <- as.data.frame(eval(parse(text=i)))
+  #  T <- T %>% 
+  #    mutate(
+  #      Tail.theta = calculation$Tail.angel,
+  #      Centre.theta = calculation$Centre.angel
+  #    )
+  # if_else(i=='Head', T2 <- T ,T2 <- rbind(T2,T))
+  #}
+  
+  
   # Head <- Head %>% 
   #   mutate(
   #     Tail.theta = calculation$Tail.angel,
@@ -150,28 +155,84 @@ angle.calculation.tail <- function(filename1){
   # Tail$Tail.theta <- calculation$Tail.angel
   # Tail$Centre.theta <- calculation$Centre.angel
  # all <- rbind(Head,Centre,Tail)
- T2 <- T2 %>% mutate(
-      theta.T = circular(rad(T2$Tail.theta),type='direction'),
-    theta.C = circular(rad(T2$Centre.theta),type='direction')
- )
- #  
-  return(T2)
+  
+  
+# calculation <- calculation %>% mutate(
+ #     theta.T = circular(rad(calculation$Tail.theta),type='direction'),
+  #    theta.C = circular(rad(calculation$Centre.theta),type='direction')
+   #   ) 
+ calculation <- calculation %>% select(-ID.RUN,-ID,-Run,-Group,-Point)
+  return(calculation)
   
 }
 ####################################
 # all.mice data with angle
-all.mice <- angle.calculation.tail(all.mice) 
-any(is.na(all.mice))
-names(all.mice)
+all.mice.theta <- angle.calculation.tail(all.mice)
+test.h <- cbind(all.mice[which(all.mice$Point=='Head'),],all.mice.theta)
+test.c <- cbind(all.mice[which(all.mice$Point=='Centre'),],all.mice.theta)
+test.t <- cbind(all.mice[which(all.mice$Point=='Tail'),],all.mice.theta)
+all.mice.theta <- rbind(test.h,test.c,test.t)
 
-all.mice %>% 
-  ggplot(aes(X,Y,color=ID))+
+all.mice.theta <- all.mice.theta %>% mutate(
+       theta.T = circular(rad(all.mice.theta$Tail.angel),type='direction'),
+       theta.C = circular(rad(all.mice.theta$Centre.angel),type='direction'))
+
+
+all.mice.theta <- all.mice.theta %>% select(-X.cent.head,-Y.tail.head,-X.tail.head,-Y.cent.head,-X.tail.horizontal,-X.cent.horizontal,-horizontal.Y)
+any(is.na(all.mice.theta))
+names(all.mice.theta)
+
+all.mice.theta %>%
+  #filter(Point=='Head') %>% 
+  ggplot(aes(x=t,y=Tail.angel,colour=Run))+
+  #geom_point()+
   # geom_path()+
   # geom_point(alpha=1/10)+
   geom_smooth()+
-  facet_wrap(Group~Point)+
+  facet_wrap(~Group)+
   NULL
 
+test.wt <- all.mice.theta %>% filter(ID.RUN=='WTUT292.2eRUN1',Point=='Centre') %>% select(t,X,Y,Tail.angel)
+options(digits.sec=4)
+test.wt$t <- seq.POSIXt(from=as.POSIXct('1970-01-01 00:00:00'),by = 0.01,length.out = length(test.wt$t))
+head(test.wt)
+test.wt.xts <- xts(x=test.wt[,2:4],order.by=test.wt$t)
+
+# test.wt.xts %>%  mutate(ma.x= rollapply(test.wt.xts$X,width = 5,FUN= MEAN/0.05),
+#                            ma.y= rollapply(test.wt.xts$Y,width = 5,FUN= MEAN/0.05),
+#                            ma.theta= rollapply(test.wt.xts$Tail.angel,width = 5,FUN= MEAN/0.05))
+# test.ma.x <- rollapply(test.wt.xts$X,width = 5,FUN= )
+# test.ma.x$vel <- test.ma.x$X/0.05
+## need to use window/lag to do the rolling velocity 
+test.wt.xts$lag.x <- lag.xts(test.wt.xts$X,k=-5)
+test.wt.xts$vel.x <- (test.wt.xts$lag.x-test.wt.xts$X)/0.05
+test.wt.xts$lag.y <- lag.xts(test.wt.xts$Y,k=-5)
+test.wt.xts$vel.y <- (test.wt.xts$lag.y-test.wt.xts$Y)/0.05
+test.wt.xts$lag.theta <- lag.xts(test.wt.xts$Tail.angel,k=-5)
+test.wt.xts$vel.theta <- (test.wt.xts$lag.theta-test.wt.xts$Tail.angel)/0.05
+
+test.x.vel <- test.wt.xts$X
+test.x.vel$T.angle <- test.wt.xts$Tail.angel
+library(dygraph)
+
+
+head(test.wt.xts)
+plot.zoo(test.wt.xts,main='wt gait')
+plot.xts(test.wt.xts$vel.y,grid.ticks.on = 'seconds')
+decompose(test.wt.xts)
+test.wt.h <- test.wt %>% filter
+
+
+
+all.mice.theta %>%
+  #filter(Point=='Head') %>% 
+  ggplot(aes(x=t,y=Y,colour=Run))+
+  #geom_point()+
+  # geom_path()+
+  # geom_point(alpha=1/10)+
+  geom_smooth()+
+  facet_wrap(~Group)+
+  NULL
 all.mice %>% 
   ggplot(aes(Group,theta.C))+
   geom_boxplot(aes(fill=Group),alpha=1/2)+
@@ -222,6 +283,13 @@ all.mice %>%
   # facet_wrap(~Group)+
   theme_bw()+
   NULL 
+
+wt.r6.c <- all.mice.theta %>% filter(ID.RUN=='WTUT292.2eRUN6',Point=='Centre')
+wt.r6.c %>% ggplot(aes(t,Tail.angel))+
+  geom_line()+
+  theme_bw()+
+  NULL
+
 
 
 # Head <-  filter(T, Point == 'Head')

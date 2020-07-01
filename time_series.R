@@ -20,6 +20,47 @@ library(tsibble)#time series data structure
 library(tibbletime)#time series data structure
 library(scatterplot3d) # x,y,z plotting, but can't be moved around
 
+library(TSstudio)# ts_info()
+library(h2o)
+library(UKgrid)
+
+# ch1
+## Web API, Appication Programing Interface, capture data from specific sties
+library(Quandl)
+df2 <- Quandl(code='FRED/TOTALNSA', #the source = FRED, the name of the series is TOTALNSA
+                type='raw',
+              collapse='monthly',
+              order='asc',
+              end_date='2017-12-31')
+
+## tibble = an improved version of the data.frame 
+## different ways to extract data from a data.frome
+str(iris)
+iris$Sepal.Width[1:5]
+iris[1:5,'Sepal.Width']
+iris[1:5,which(colnames(iris)=='Sepal.Width')]
+
+# ch2 : working with data and time object
+## timestamp : date, time other index format depending on the series frequency
+## POSIXCT, POSIXLT, Date = the ISO 8601
+date <- Sys.Date()
+time_ct <- Sys.time() # POSIXCT, store as a vector
+time_lt <- as.POSIXlt(time_ct) # store as a list 
+unclass(time_ct)
+# [1] 1591304910
+unclass(time_lt)
+## POSIXct components : 
+### wday = 0-6, 0= sunday
+### isdst = daylight saving time flag
+## importing data and time objects
+url <- "https://raw.githubusercontent.com/RamiKrispin/Hands-On-Time-Series-Analysis-with-R/master/dates_formats.csv"
+dates_df <- read.csv(url, stringsAsFactors = FALSE)
+## creating a date or time index
+
+
+
+
+
 read.excel.sheet <- function(filename){
   names.sht <- excel_sheets(filename)
   for(i in 1:length(names.sht)) 
@@ -60,19 +101,58 @@ all.mice %>% select(ID,Group,Run,ID.RUN,everything())
 
 
 unique(all.mice$ID.RUN)
+
 WTUT292.2eRUN1 <- all.mice %>% filter(ID.RUN=='WTUT292.2eRUN1',Point=='Centre')
-WTUT292.2eRUN1 <- WTUT292.2eRUN1 %>% select('X','Y','t')
-scatterplot3d(WTUT292.2eRUN1$X,WTUT292.2eRUN1$Y,WTUT292.2eRUN1$t,pch=20,highlight.3d = TRUE)
+WTUT292.2eRUN1 <- WTUT292.2eRUN1 %>% select('Y','t')
+# scatterplot3d(WTUT292.2eRUN1$X,WTUT292.2eRUN1$Y,WTUT292.2eRUN1$t,pch=20,highlight.3d = TRUE)
 
 diff(WTUT292.2eRUN1$t)# chechk the sampling interval, lag= 0.01 second
-t.time <- parse_hms(paste('00:00:',WTUT292.2eRUN1$t)  ) # create index
+
+t.time <- as.POSIXct(WTUT292.2eRUN1$t, origin = '2020-06-02 00:00:00') # create index
 # t.second <- as.second(t.time)
+diff(t.time)
+
+## create a equally spaced interval for time index
+t=0
+t.time1 <- vector(length=length(WTUT292.2eRUN1$t))
+for (i in 1:length(WTUT292.2eRUN1$t)){
+  t.time1[i] <- 0.01*i
+}
+t.time1 <- as.POSIXct(t.time1,origin = '2020-06-02 00:00:00')
+diff(t.time1) 
+
+# create a equally spaced interval for time indes via seq.POSIXt
+t.time2 <- seq.POSIXt(from=as.POSIXct('2020-06-02'),units='seconds',by=0.01,length.out=length(WTUT292.2eRUN1$t))
+diff(t.time2)
+#t.time2 <- format(t.time2,format ='%Y-%m-%d %H:%M:%OS3' )
+t.time2
+
+
+t.time3 <- paste('2020-06-02 00:00:',WTUT292.2eRUN1$t,sep = '')
+t.time3 <- as.POSIXct(t.time3,format='%Y-%m-%d %H:%M:%OS')
+# t.time3 <- format(t.time3,format ='%Y-%m-%d %H:%M:%OS3' )
+class(t.time3)
+
+wtut.zoo <- zoo(WTUT292.2eRUN1$Y,order.by=t.time)
+wtut.zoo1 <- zoo(WTUT292.2eRUN1$Y,order.by=t.time1)
+wtut.zoo2 <- zoo(WTUT292.2eRUN1$Y,order.by=t.time2)
+wtut.zoo3 <- zoo(WTUT292.2eRUN1$Y,order.by=t.time3)
+
+ts_info(wtut.zoo2)
+class(wtut.zoo2)
+is.regular(wtut.zoo2)
+plot(wtut.zoo2)
+plot.zoo(wtut.zoo3)
+
+wtut.ma <- ts_ma(wtut.zoo2,n_left=2,plot = TRUE)
+
 
 #WTUT292.2eRUN1.ts <- ts(WTUT292.2eRUN1$Y,order.by=t.time)
 WTUT292.2eRUN1.zoo <- zoo(WTUT292.2eRUN1$Y,order.by = t.time)
 #WTUT292.2eRUN1.xts <- xts(WTUT292.2eRUN1$Y,order.by = t.time)
 
-
+head(cycle(WTUT292.2eRUN1.zoo))
+head(time(WTUT292.2eRUN1.zoo))
 WTUT292.2eRUN1$t <- t.time
 WTUT292.2eRUN1.tt <- WTUT292.2eRUN1 %>% tbl_time(index=t)
 WTUT292.2eRUN1.tt %>%  ggplot(aes(x=t,y=Y))+
@@ -88,7 +168,7 @@ WTUT292.2eRUN1.ts <- ts(WTUT292.2eRUN1)
   
 
 
-WTUT292.2eRUN1$t <- as.POSIXct(WTUT292.2eRUN1$t, format = "%S",origin = '0')
+
 
 WTUT292.2eRUN1.ts <- ts(WTUT292.2eRUN1,start=1990,frequency=12)
 WTUT292.2eRUN1.ts.dec <- decompose(WTUT292.2eRUN1.ts,type = 'mult')

@@ -326,4 +326,21 @@ ts_weatherData <- read_table2("https://raw.githubusercontent.com/lyndadotcom/LPO
 * rolling statistics
     * roll function
 * time series graphs 
+\newpage
+
+# ch3 The Time Series Object
+```{r}
+library(Quandl)
+NGG <- Quandl(code='FRED/NATURALGAS',
+              collapse = 'quarterly',
+              type='ts',
+              end_date='2018-12-31')
+plot.ts(NGG,
+        main='US quarterly NGC',
+        ylab='Billion of cubic feet')
+ts_info(NGG )
+```
+
+
+
 
