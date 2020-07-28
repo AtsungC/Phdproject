@@ -57,7 +57,8 @@ dim(filter(all.mice,Point=='Centre'))
 
 check <- all.mice %>%  # check the number of data of each run in three points
   group_by(ID,Point) %>% 
-  dplyr::summarise(n =n())
+  dplyr::summarise(count=n())
+
 
 ################## 
 # separate ID, Run and Group with regular expression
@@ -71,6 +72,8 @@ all.mice <- all.mice %>%
   )
 all.mice %>% select(ID,Group,Run,ID.RUN,everything())
  
+
+
 # location.Run <- as.data.frame(str_locate(all.mice$ID,pattern = 'RUN'))
 # location.Run$Length <- str_length(all.mice$ID)
 # all.mice$Run <- substr(all.mice$ID,location.Run$start,location.Run$Length)
@@ -219,12 +222,12 @@ library(dygraph)
 head(test.wt.xts)
 plot.zoo(test.wt.xts,main='wt gait')
 plot.xts(test.wt.xts$vel.y,grid.ticks.on = 'seconds')
-decompose(test.wt.xts)
+plot(decompose(test.wt.xts))
 test.wt.h <- test.wt %>% filter
 
 
 
-all.mice.theta %>%
+all.mice %>%
   #filter(Point=='Head') %>% 
   ggplot(aes(x=t,y=Y,colour=Run))+
   #geom_point()+
@@ -233,15 +236,7 @@ all.mice.theta %>%
   geom_smooth()+
   facet_wrap(~Group)+
   NULL
-all.mice %>% 
-  ggplot(aes(Group,theta.C))+
-  geom_boxplot(aes(fill=Group),alpha=1/2)+
-  # geom_point(aes(color=ID),alpha=1/10)+
-  # facet_wrap(~Group)+
-  theme_bw()+
-  NULL
-
-all.mice %>% 
+all.mice.theta %>% 
   ggplot(aes(Group,theta.C))+
   geom_boxplot(aes(fill=ID),alpha=1/2)+
   # geom_point(aes(color=ID),alpha=1/10)+
@@ -249,7 +244,15 @@ all.mice %>%
   theme_bw()+
   NULL
 
-all.mice %>% 
+all.mice.theta %>% 
+  ggplot(aes(Group,theta.C))+
+  geom_boxplot(aes(fill=ID),alpha=1/2)+
+  # geom_point(aes(color=ID),alpha=1/10)+
+  # facet_wrap(~Group)+
+  theme_bw()+
+  NULL
+
+all.mice.theta %>% 
   ggplot(aes(Group,theta.T))+
   geom_boxplot(aes(fill=Group),alpha=1/2)+
   # geom_point(aes(color=ID),alpha=1/10)+
@@ -257,7 +260,7 @@ all.mice %>%
   theme_bw()+
   NULL
 
-all.mice %>% 
+all.mice.theta %>% 
   ggplot(aes(Group,theta.T))+
   geom_boxplot(aes(fill=ID),alpha=1/2)+
   # geom_point(aes(color=ID),alpha=1/10)+
@@ -268,15 +271,15 @@ all.mice %>%
 names(all.mice)
 
 
-all.mice %>% 
+all.mice.theta %>% 
   ggplot(aes(Point,theta.T))+
-  geom_boxplot(aes(fill=ID),alpha=1/2)+
+  geom_boxplot(aes(fill=Group),alpha=1/2)+
   # geom_point(aes(color=ID),alpha=1/10)+
   facet_wrap(~Group)+
   theme_bw()+
   NULL  
 
-all.mice %>% 
+all.mice.theta %>% 
   ggplot(aes(theta.C,theta.T))+
   # geom_boxplot(aes(fill=ID),alpha=1/2)+
   geom_point(aes(color=ID),alpha=1/10)+
@@ -319,12 +322,17 @@ wt.r6.c %>% ggplot(aes(t,Tail.angel))+
 ################################################################################
 # ########### summary of Velocity and Angle function 
 # all.mice$CircAngle <- circular(rad(all.mice$theta),type='direction')
+
+
+
 Average.velocity <- function(filename2){
+  ungroup(filename2)
   points <- c('Head','Centre','Tail')
   for (i in points) {
-    T <-filename2 %>% filter(Point==i) %>% 
-      group_by(Group,ID,Run) %>% 
-      dplyr::summarise(Xstart=X[which(t==0)],
+    T <-filename2 %>% 
+      group_by(Group,ID,Run) %>%
+      filter(Point==i) %>% 
+          dplyr::summarise(Xstart=X[which(t==0)],
                        Ystart=Y[which(t==0)],
                        Xend = X[which(t==max(t))],
                        Yend = Y[which(t==max(t))],
@@ -409,7 +417,9 @@ Average.velocity <- function(filename2){
   
 }
 
-Vel.all.mice <- Average.velocity(all.mice)
+Vel.all.mice <- Average.velocity(all.mice.theta)
+
+
 any(is.na(Vel.all.mice))
 names(Vel.all.mice)
 Vel.all.micez <- drop_na(Vel.all.mice)
@@ -426,13 +436,19 @@ Vel.all.mice %>%
   NULL
 
 Vel.all.mice %>% 
-  ggplot(aes(Group,mean.angle.T))+
+  ggplot(aes(Group,var.angle.T))+
   geom_boxplot()+
   geom_point(aes(color=ID))+
   # facet_wrap(~Group)+
   theme_bw()+
   NULL
-
+Vel.all.mice %>% 
+  ggplot(aes(Group,var.angle.C))+
+  geom_boxplot()+
+  geom_point(aes(color=ID))+
+  # facet_wrap(~Group)+
+  theme_bw()+
+  NULL
 Vel.all.mice %>% 
   ggplot(aes(var.angle.T,var.angle.C))+
   # geom_boxplot()+
@@ -472,6 +488,44 @@ P <- plot_ly(Summary.all.mice,x = ~madY,y= ~mean.velocity,z= ~mean.angle, color 
                       zaxis = list(title = 'mean.ang')))
 
 ######### segment velocity in Centre 
+all.mice %>% 
+  filter(Point=='Head') %>%
+  group_by(ID.RUN) %>% 
+  summarise(t=length(t))
+# segment by time 
+ex.t <- function(filename,run){
+  Pts <- c('Head','Centre','Tail')
+  d3 <- data.frame()
+  d4 <- data.frame()
+  for (j in Pts) {
+    # uni.run <- unique(all.mice$Run[which(all.mice$ID==filename)])
+    d0 <- all.mice %>% filter(ID==filename,Point==j,Run==run)
+    N.cell <- round(max(d0$t)/0.1)
+    # N.cell <- ceiling(max(d0$X)/1)
+    CUT <- cut(d0$t,N.cell,labels = 1:N.cell)
+    d0 <- cbind(d0,CUT)
+    CUT1 <- unique(d0$CUT)
+    d2 <- data.frame()
+    
+    for (i in 1:length(CUT1)) {
+      d1 <- d0 %>% filter(CUT==CUT1[i])
+      d3 <- d1 %>% dplyr::summarise(
+        vel= unique(sqrt(max(X)-min(X))^2+(max(Y[which(X==max(X))])-min(Y[which(X==min(X))]))^2)/(max(t)-min(t)),
+        mad.Y = mad(Y),
+        in.t = max(t)-min(t),
+        Point=j,
+        # mad.ang = mad(theta)
+      )
+      d2 <- rbind(d2,d3)
+    }
+    d4 <- rbind(d4,d2)
+    
+  }
+  
+  return(d4)
+}
+
+
 
 ex <- function(filename,run){
   Pts <- c('Head','Centre','Tail')
@@ -504,7 +558,9 @@ ex <- function(filename,run){
   
   return(d4)
 }
+test0 <- ex.t('WTUT292.2e','RUN2')
 
+test0<- ex.t('NPCUT310.1d','RUN3')
 test0<- ex('NPCUT310.1d','RUN3')
 any(is.na(test0))
 # test0 %>% filter(vel<=500) %>% ggplot(aes(y=vel))+
@@ -517,11 +573,13 @@ ex2 <- function(filename){
   # leng.run <- length(uni.run)
   dd1 <- data.frame()
   for (i in uni.run) {
-    dd0 <- ex(filename,i)
+    dd0 <- ex.t(filename,i)
+    dd0 <- dd0 %>% mutate(Run=i)
     dd1 <- rbind(dd1,dd0)
   }
   return(dd1)
 }
+test0 <- ex2('NPCUT310.1d')
 
 ex3 <- function(filename){
   ID <- unique(filename$ID)
@@ -537,6 +595,18 @@ ex3 <- function(filename){
 
 all.vel.summary <- drop_na(ex3(all.mice))
 
+all.vel.summary  %>%  ggplot(aes(x=in.t))+
+  geom_histogram()+
+  NULL
+
+less.t <- all.vel.summary %>% filter(in.t<=0.08)
+unique(less.t$ID)
+
+all.mice[ID="WTUT292.2e",RUN='Run2']
+all.vel.summary %>% filter(ID=="WTUT292.2e")
+
+colnames(all.vel.summary)
+
 any(is.na(all.vel.summary))
 all.vel.summary[which(is.na(all.vel.summary)),]
 all.vel.summary %>% 
@@ -547,7 +617,18 @@ all.vel.summary %>%
   geom_point(aes(color=ID))+
   facet_wrap(~Group)+
 NULL
+all.vel.summary %>%
+  filter(Point=='Centre') %>%  
+  ggplot(aes(vel))+
+  geom_histogram()+
+  facet_wrap(~Group)+
+  xlim(NA,3000)+
+  theme_bw()+
+  NULL
 
+
+
+ 
 all.vel.summary %>% 
   # filter(Group=='WTUT')%>%  
   ggplot(aes(Point,vel))+
