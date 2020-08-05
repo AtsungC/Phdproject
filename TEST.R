@@ -11,7 +11,10 @@
  library(plotmo)
  library(dplyr)
  library(caret)
- 
+ library(gridExtra)
+ library(TSstudio)
+ library(xts)
+ library(forecast)
  # clear up the environment
  rm(list = ls())
  
@@ -195,12 +198,305 @@ all.mice.theta %>%
   facet_wrap(~Group)+
   NULL
 
-test.wt <- all.mice.theta %>% filter(ID.RUN=='WTUT292.2eRUN1',Point=='Centre') %>% select(t,X,Y,Tail.angel)
+WTUT292.2eRUN1.xts <- all.mice.theta %>% filter(ID.RUN=='WTUT292.2eRUN1',Point=='Centre') %>% select(t,X,Y,theta.C,theta.T)
 options(digits.sec=4)
-test.wt$t <- seq.POSIXt(from=as.POSIXct('1970-01-01 00:00:00'),by = 0.01,length.out = length(test.wt$t))
-head(test.wt)
-test.wt.xts <- xts(x=test.wt[,2:4],order.by=test.wt$t)
+WTUT292.2eRUN1.xts$t <- seq.POSIXt(from=as.POSIXct('1970-01-01 00:00:00'),by = 0.01,length.out = length(WTUT292.2eRUN1.xts$t))
+head(WTUT292.2eRUN1.xts)
+WTUT292.2eRUN1.xts <- xts(x=WTUT292.2eRUN1.xts[,2:5],order.by=WTUT292.2eRUN1.xts$t)
+attr(WTUT292.2eRUN1.xts,'frequency') <-60
+frequency(WTUT292.2eRUN1.xts)
 
+
+USgas
+acf(USgas,lag.max = 60)
+
+acf(WTUT292.2eRUN1.xts$Y,lag.max = 60)
+pacf(WTUT292.2eRUN1.xts$Y,lag.max = 60)
+ts_lags(WTUT292.2eRUN1.xts$Y,lags = c(1,24,25,26))
+len
+partition <- ts_split(as.ts(WTUT292.2eRUN1.xts$Y),sample.out=(length(WTUT292.2eRUN1.xts$X)*0.2))
+partition.t <- ts_split(as.ts(WTUT292.2eRUN1.xts$theta.T),sample.out=(length(WTUT292.2eRUN1.xts$X)*0.2))
+partition.c <- ts_split(as.ts(WTUT292.2eRUN1.xts$theta.C),sample.out=(length(WTUT292.2eRUN1.xts$X)*0.2))
+
+train <- partition$train
+class(train)
+
+train.y <- ts_to_prophet(ts.obj=train)
+train.t <- ts_to_prophet(partition.t$train)
+train.c <- ts_to_prophet(partition.c$train)
+
+test.y <- ts_to_prophet(partition$test)
+test.t <- ts_to_prophet(partition.t$test)
+test.c <- ts_to_prophet(partition.c$test)
+
+length(WTUT292.2eRUN1.xts$Y)*0.8
+df.train <- WTUT292.2eRUN1.xts[1:(length(WTUT292.2eRUN1.xts$Y)*0.8),]
+df.test <-  WTUT292.2eRUN1.xts[(length(WTUT292.2eRUN1.xts$Y)*0.8-1):length(WTUT292.2eRUN1.xts$Y),]
+h2o.init(max_mem_size = '4G')
+train.h <- as.h2o(df.train)
+test.h <- as.h2o(df.test)
+auto.md <- h2o.automl()
+
+
+md <- auto.arima(partition$train)
+checkresiduals(md)
+fc <- forecast(md,h=length(WTUT292.2eRUN1.xts$X)*0.2)
+na <- naive(partition$train,h=length(WTUT292.2eRUN1.xts$X)*0.2)
+accuracy(fc,partition$test)
+accuracy(na,partition$test)
+test_forecast(actual = as.ts(WTUT292.2eRUN1.xts$Y),forecast.obj = fc,test = partition$test)
+
+md_f <- auto.arima(WTUT292.2eRUN1.xts$Y)
+fc_f <- forecast(md_f,h=length(WTUT292.2eRUN1.xts$X)*0.2)
+plot_forecast(fc_f)
+
+library(h2o)
+h2o.init(max_mem_size = '4G')
+
+
+
+
+  for ( i in 1:length(unique(all.mice.theta$ID.RUN))) {
+  df0 <- all.mice.theta %>% filter(ID.RUN==unique(all.mice.theta$ID.RUN)[i-1],Point=='Centre') %>% select(t,X,Y,theta.C,theta.T)
+  options(digits.sec=4)
+  df0$t <- seq.POSIXt(from=as.POSIXct('1970-01-01 00:00:00'),by = 0.01,length.out = length(df0$t))
+  print(unique(all.mice.theta$ID.RUN)[i])
+  df0 <- xts(x=df0[,2:5],order.by=df0$t)
+  attr(df0,'frequency') <- 60
+  
+  df1 <- all.mice.theta %>% filter(ID.RUN==unique(all.mice.theta$ID.RUN)[i],Point=='Centre') %>% select(t,X,Y,theta.C,theta.T)
+  options(digits.sec=4)
+  df0$t <- seq.POSIXt(from=as.POSIXct('1970-01-01 00:00:00'),by = 0.01,length.out = length(df0$t))
+  print(unique(all.mice.theta$ID.RUN)[i])
+  df0 <- xts(x=df0[,2:5],order.by=df0$t)
+  attr(df0,'frequency') <- 60
+  print(i)
+  # ifelse(i%%2==0,all.xts<- merge.xts(
+    # paste0(unique(all.mice.theta$ID.RUN)[i-1])=df0,
+    # paste0(unique(all.mice.theta$ID.RUN)[i])=df1),next())
+}
+
+NPCTG286.1gRUN1.xts <- all.mice.theta %>% filter(ID.RUN=='NPCTG286.1gRUN1',Point=='Centre') %>% select(t,X,Y,theta.C,theta.T)
+options(digits.sec=4)
+NPCTG286.1gRUN1.xts$t <- seq.POSIXt(from=as.POSIXct('1970-01-01 00:00:00'),by = 0.01,length.out = length(NPCTG286.1gRUN1.xts$t))
+# head(WTUT292.2eRUN1.xts)
+NPCTG286.1gRUN1.xts <- xts(x=NPCTG286.1gRUN1.xts[,2:5],order.by=NPCTG286.1gRUN1.xts$t)
+attr(NPCTG286.1gRUN1.xts,'frequency') <-60
+plot.zoo(NPCTG286.1gRUN1.xts)
+
+
+WTUT292.2eRUN1.xts <- all.mice.theta %>% filter(ID.RUN=='WTUT292.2eRUN1',Point=='Centre') %>% select(t,X,Y,theta.C,theta.T)
+options(digits.sec=4)
+WTUT292.2eRUN1.xts$t <- seq.POSIXt(from=as.POSIXct('1970-01-01 00:00:00'),by = 0.01,length.out = length(WTUT292.2eRUN1.xts$t))
+head(WTUT292.2eRUN1.xts)
+WTUT292.2eRUN1.xts <- xts(x=WTUT292.2eRUN1.xts[,2:5],order.by=WTUT292.2eRUN1.xts$t)
+attr(WTUT292.2eRUN1.xts,'frequency') <-60
+frequency(WTUT292.2eRUN1.xts)
+
+WTUT292.2eRUN1.xts <- all.mice.theta %>% filter(ID.RUN=='WTUT292.2eRUN1',Point=='Centre') %>% select(t,X,Y,theta.C,theta.T)
+options(digits.sec=4)
+WTUT292.2eRUN1.xts$t <- seq.POSIXt(from=as.POSIXct('1970-01-01 00:00:00'),by = 0.01,length.out = length(WTUT292.2eRUN1.xts$t))
+# head(WTUT292.2eRUN1.xts)
+WTUT292.2eRUN1.xts <- xts(x=WTUT292.2eRUN1.xts[,2:5],order.by=WTUT292.2eRUN1.xts$t)
+attr(WTUT292.2eRUN1.xts,'frequency') <-60
+# frequency(WTUT292.2eRUN1.xts)
+
+NPCTG286.1gRUN1.xts <- all.mice.theta %>% filter(ID.RUN=='NPCTG286.1gRUN1',Point=='Centre') %>% select(t,X,Y,theta.C,theta.T)
+options(digits.sec=4)
+NPCTG286.1gRUN1.xts$t <- seq.POSIXt(from=as.POSIXct('1970-01-01 00:00:00'),by = 0.01,length.out = length(NPCTG286.1gRUN1.xts$t))
+# head(WTUT292.2eRUN1.xts)
+NPCTG286.1gRUN1.xts <- xts(x=NPCTG286.1gRUN1.xts[,2:5],order.by=NPCTG286.1gRUN1.xts$t)
+attr(NPCTG286.1gRUN1.xts,'frequency') <-60
+
+WTUT292.2eRUN2.ts <- all.mice.theta %>% filter(ID.RUN=='WTUT292.2eRUN2',Point=='Centre') %>% select(t,Y)
+options(digits.sec=4)
+WTUT292.2eRUN2.ts <- as.ts(x=WTUT292.2eRUN2.ts[,2],order.by=WTUT292.2eRUN2.ts$t)
+class(WTUT292.2eRUN2.ts)
+
+NPCUT293.2cRUN11.xts <- all.mice.theta %>% filter(ID.RUN=='NPCUT293.2cRUN11',Point=='Centre') %>% select(t,X,Y,theta.C,theta.T)
+options(digits.sec=4)
+NPCUT293.2cRUN11.xts$t <- seq.POSIXt(from=as.POSIXct('1970-01-01 00:00:00'),by = 0.01,length.out = length(NPCUT293.2cRUN11.xts$t))
+# head(WTUT292.2eRUN1.xts)
+NPCUT293.2cRUN11.xts <- xts(x=NPCUT293.2cRUN11.xts[,2:5],order.by=NPCUT293.2cRUN11.xts$t)
+attr(NPCUT293.2cRUN11.xts,'frequency') <-60
+
+NPCUT293.2cRUN7.ts <- all.mice.theta %>% filter(ID.RUN=='NPCUT293.2cRUN7',Point=='Centre') %>% select(t,Y)
+options(digits.sec=4)
+NPCUT293.2cRUN7.ts<- as.ts(x=NPCUT293.2cRUN7.ts[,2],order.by=NPCUT293.2cRUN7.ts$t)
+class(NPCUT293.2cRUN7.ts)
+
+NPCUT293.2cRUN3.ts <- all.mice.theta %>% filter(ID.RUN=='NPCUT293.2cRUN3',Point=='Centre') %>% select(t,Y)
+options(digits.sec=4)
+NPCUT293.2cRUN3.ts<- as.ts(x=NPCUT293.2cRUN3.ts[,2],order.by=NPCUT293.2cRUN3.ts$t)
+class(NPCUT293.2cRUN3.ts)
+wtut.md <- auto.arima(NPCUT293.2cRUN3.ts)
+
+
+wtut.md <- auto.arima(as.ts(WTUT292.2eRUN1.xts$Y))
+fc.wtut.md.wt <- forecast(wtut.md,h=length(WTUT292.2eRUN2.ts))
+fc.wtut.md.npc <- forecast(wtut.md,h=length(NPCUT293.2cRUN7.ts))
+fc.wtut.md.npc.2 <- forecast(wtut.md,h=length(NPCUT293.2cRUN3.ts))
+fc.wtut.tg <- forecast(wtut.md,h=length(NPCTG286.1gRUN1.xts$Y))
+accuracy(fc.wtut.md.wt,WTUT292.2eRUN2.ts)
+accuracy(fc.wtut.md.npc,NPCUT293.2cRUN7.ts)
+accuracy(fc.wtut.md.npc,NPCUT293.2cRUN3.ts)
+accuracy(fc.wtut.tg,as.ts(NPCTG286.1gRUN1.xts$Y))
+fc.wtut.md.12 <- forecast(wtut.md,h=12)
+plot_forecast(fc.wtut.md.wt)
+
+wtut.md.sim <- arima.sim(model = list(order=c(0,1,2),ma=c(-0.083,0.4)),n=500) 
+ts_plot(as.ts(WTUT292.2eRUN1.xts$Y))
+ts_plot(wtut.md.sim)
+
+NPCUT.md <- auto.arima(as.ts(NPCUT293.2cRUN11.xts$Y))
+fc.npc.md.wt <- forecast(NPCUT.md,h=length(WTUT292.2eRUN2.ts))
+# fc.npc.md.npc <- forecast(NPCUT.md,h=length(NPCUT293.2cRUN7.ts))
+fc.npc.md.npc.2 <- forecast(NPCUT.md,h=length(NPCUT293.2cRUN3.ts))
+fc.npc.tg <- forecast(NPCUT.md,h=length(NPCTG286.1gRUN1.xts$Y))
+accuracy(fc.npc.md.wt,WTUT292.2eRUN2.ts)
+# accuracy(fc.npc.md.npc,NPCUT293.2cRUN7.ts)
+accuracy(fc.npc.md.npc,NPCUT293.2cRUN3.ts)
+accuracy(fc.npc.tg,as.ts(NPCTG286.1gRUN1.xts$Y))
+
+NPCUT.md.sim <- arima.sim(model = list(order=c(1,1,1),ar=0.66,ma=-.04),n=500) 
+plot(as.ts(NPCUT293.2cRUN11.xts$Y))
+ts_plot(NPCUT.md.sim)
+
+
+NPCUT293.2cRUN11.xts <- all.mice.theta %>% filter(ID.RUN=='NPCUT293.2cRUN11',Point=='Centre') %>% select(t,X,Y,theta.C,theta.T)
+options(digits.sec=4)
+NPCUT293.2cRUN11.xts$t <- seq.POSIXt(from=as.POSIXct('1970-01-01 00:00:00'),by = 0.01,length.out = length(NPCUT293.2cRUN11.xts$t))
+# head(WTUT292.2eRUN1.xts)
+NPCUT293.2cRUN11.xts <- xts(x=NPCUT293.2cRUN11.xts[,2:5],order.by=NPCUT293.2cRUN11.xts$t)
+attr(NPCUT293.2cRUN1.xts,'frequency') <-60
+# frequency(WTUT292.2eRUN1.xts)
+library(TSstudio)
+library(xts)
+ts_info(NPCUT293.2cRUN11.xts)
+ts_info(WTUT292.2eRUN1.xts)
+
+test.xts <- merge.xts(NPCUT293.2cRUN1=NPCUT293.2cRUN11.xts,
+                      WTUT292.2eRUN1=WTUT292.2eRUN1.xts,all=c(TRUE,TRUE))
+
+plot(decompose(as.ts(test.xts$Y)))
+
+
+
+
+de <- decompose(test.xts$Y)
+plot.ts(de)
+plot.zoo(test.xts)
+
+plot(decompose(as.ts(NPCUT293.2cRUN1.xts$Y)))
+
+NPCTG294.2cRUN2.xts <- 
+  all.mice.theta %>% 
+  filter(ID.RUN=='NPCTG294.2cRUN2',Point=='Centre') %>%
+  select(t,X,Y,theta.C,theta.T)
+
+max(NPCTG294.2cRUN2.xts$t)
+
+a <- plot.zoo(WTUT292.2eRUN1.xts)
+b <- plot.zoo(WTUT292.2eRUN1.xts$Y)
+grid.arrange(a,b,nrow=1)
+# attr(WTUT292.2eRUN1.xts,'frequenct') <- 0.01
+plot(decompose(as.ts(WTUT292.2eRUN1.xts$theta.C)))
+
+periodicity(WTUT292.2eRUN1.xts)
+ts_info(WTUT292.2eRUN1.xts)
+library(TSstudio)
+
+decompose(as.ts(WTUT292.2eRUN1.xts$Y))
+library(forecast)
+findfrequency(WTUT292.2eRUN1.xts$Y)
+
+plot(WTUT292.2eRUN1.xts$Y,main='WTUT292.2eRUN1')
+abline(v=0.042)
+
+p <- all.mice.theta %>% filter(ID=='WTUT292.2e',Point=='Head',Run %in% c('RUN1','RUN2','RUN3'))
+
+
+library(gifski)
+p <- all.mice.theta %>% filter(ID.RUN=='WTUT292.2eRUN1',Point=='Centre') %>% ggplot(aes(x=X,y=Y))+
+  geom_line()+
+  ggtitle('WTUT292.2eRUN1')+
+   transition_reveal(t)+
+  theme_bw()+
+  # geom_path() +
+  NULL
+animate(p,renderer = gifski_renderer())
+
+all.mice.theta %>% filter(ID.RUN=='WTUT292.2eRUN1',Point=='Centre') %>% ggplot(aes(x=t,y=Y))+
+  geom_line()+
+  ggtitle('WTUT292.2eRUN1')+
+  theme_bw()+
+  NULL
+all.mice.theta %>% filter(ID.RUN=='WTUT292.2eRUN1',Point=='Centre') %>% ggplot(aes(x=t,y=X))+
+  geom_line()+
+  ggtitle('WTUT292.2eRUN1')+
+  theme_bw()+
+  NULL
+all.mice.theta %>% filter(ID.RUN=='WTUT292.2eRUN1',Point=='Centre') %>% 
+  ggplot(aes(x=t,y=theta.T))+
+  geom_line()+
+  ggtitle('WTUT292.2eRUN1')+
+  theme_bw()+
+  NULL
+all.mice.theta %>% filter(ID.RUN=='WTUT292.2eRUN1',Point=='Centre') %>% 
+  ggplot(aes(x=t,y=theta.C))+
+  geom_line()+
+  ggtitle('WTUT292.2eRUN1')+
+  theme_bw()+
+  NULL
+
+a <- all.mice.theta %>% filter(Group=='WTUT',Point=='Centre') %>% 
+  ggplot(aes(x=t,y=X,col=ID.RUN))+
+  geom_line()+
+  ggtitle('WTUT')+
+  scale_x_continuous(breaks = seq(0, 5, 1)) +
+  coord_cartesian(ylim = c(-300, 300)) +
+  theme(legend.position = "none")+
+  # theme_bw()+
+  NULL
+b <- all.mice.theta %>% filter(Group=='NPCUT',Point=='Centre')  %>% 
+  ggplot(aes(x=t,y=X,col=ID.RUN))+
+  geom_line()+
+  scale_x_continuous(breaks = seq(0, 5, 1)) +
+  coord_cartesian(ylim = c(-300, 300)) +
+  ggtitle('NPCUT')+
+  theme(legend.position = "none")+
+  # theme_bw()+
+  NULL
+c<- all.mice.theta %>% filter(Group=='NPCTG',Point=='Centre')  %>% 
+  ggplot(aes(x=t,y=Y,col=ID.RUN))+
+  geom_line()+
+  scale_x_continuous(breaks = seq(0, 5, 1)) +
+  coord_cartesian(ylim = c(-30, 30)) +
+  ggtitle('NPCTG')+
+  theme(legend.position = "none")+
+  # theme_bw()+
+  NULL
+
+grid.arrange(a,b,c,nrow=1)
+
+?grid.arrange
+all.mice.theta.xts <- for (i in unique(all.mice.theta$ID.RUN)) {
+  df0 <- all.mice.theta %>% filter(ID.RUN==i,Point=='Centre') %>% select(t,X,Y,theta.C,theta.T,ID.RUN)
+  options(digits.sec=4)
+  df0$t <- seq.POSIXt(from = as.POSIXct('1970-01-01 00:00:00'),by=0.01,length.out = length(df0$X))
+  df0.xts <- xts(x=df0[,2:6],order.by = df0$t)
+  ID.RUN <- unique(all.mice.theta$ID.RUN)
+  ifelse(i==ID.RUN[1],xts <- df0.xts ,xts <- rbind.xts(xts,df0.xts)) 
+  return(xts)
+  }
+
+plot.zoo(all.mice.theta.xts)
+
+
+
+
+all.mice.theta %>% filter(ID=='NPCUT293.2c') %>% group_by(ID.RUN) %>% 
+  summarise(n=n())
 # test.wt.xts %>%  mutate(ma.x= rollapply(test.wt.xts$X,width = 5,FUN= MEAN/0.05),
 #                            ma.y= rollapply(test.wt.xts$Y,width = 5,FUN= MEAN/0.05),
 #                            ma.theta= rollapply(test.wt.xts$Tail.angel,width = 5,FUN= MEAN/0.05))

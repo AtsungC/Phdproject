@@ -5,7 +5,7 @@ output: html_document
 
 ```{r setup, include=FALSE}
 knitr::opts_chunk$set(echo = F)
-
+ library(forecast)
  library(readxl)
  library(stringr)
  library(ggplot2)
@@ -165,7 +165,7 @@ ex3 <- function(filename){
 ## 1. Tranditional analysis (descriptive analysis)
 ### Data sets definition 
 #### 1. all.mice : import data from xls
-```{r}
+```{r,cache=T}
 all.mice <- read.excel.sheet('NPCTG1.xlsx')
 all.mice <- all.mice %>% rename(c('ID.RUN'='ID'))
 all.mice <- all.mice %>% 
@@ -194,7 +194,7 @@ all.mice.theta <- all.mice.theta %>% select(-X.cent.head,-Y.tail.head,-X.tail.he
 knitr::kable(head(all.mice.theta),caption='Raw data with rotating angle (theta)')
 ```
 #### 3. all.mice.average.vel : average velocity each run calculation
-```{r}
+```{r, cache=T}
 all.mice.average.vel <- Average.velocity(all.mice.theta)
 knitr::kable(head(all.mice.average.vel),caption='each run velocit')
 
@@ -208,14 +208,15 @@ knitr::kable(head(all.mice.segment.vel),caption='velocity in segments')
 
 ### Graphs 
 #### 1.all.mice
-```{r}
+
+```{r, cache=T}
 all.mice %>%
   #filter(Point=='Head') %>% 
-  ggplot(aes(x=t,y=Y,colour=ID))+
+  ggplot(aes(x=X,y=Y,colour=ID))+
   #geom_point()+
   # geom_path()+
   # geom_point(alpha=1/10)+
-  geom_smooth()+
+  geom_smooth(method = "lm", formula = y ~ splines::bs(x, 3), se = FALSE)+
   facet_wrap(~Group)+
   NULL
 ```
@@ -223,18 +224,19 @@ all.mice %>%
 #### 2.all.mice.theta
 * Centre theta \n
 
-```{r}
+```{r, cache=T}
 all.mice.theta %>% 
   ggplot(aes(Group,theta.C))+
-  geom_boxplot(aes(fill=Group),alpha=1/2)+
+  geom_violin(aes(fill=Group),alpha=1/2)+
   # geom_point(aes(color=ID),alpha=1/10)+
   # facet_wrap(~Group)+
   theme_bw()+
+  theme(legend.position='none')
   NULL
 
 all.mice.theta %>% 
   ggplot(aes(Group,theta.C))+
-  geom_boxplot(aes(fill=ID),alpha=1/2)+
+  geom_violin(aes(fill=ID),alpha=1/2)+
   # geom_point(aes(color=ID),alpha=1/10)+
   # facet_wrap(~Group)+
   theme_bw()+
@@ -243,7 +245,7 @@ all.mice.theta %>%
 
 * Tail theta  \n
 
-```{r}
+```{r, cache=T}
 all.mice.theta %>% 
   ggplot(aes(Group,theta.T))+
   geom_boxplot(aes(fill=Group),alpha=1/2)+
@@ -264,7 +266,7 @@ all.mice.theta %>%
 #### 3.all.mice.average.vel
 * mean velocity \n
 
-```{r}
+```{r, cache=T}
  all.mice.average.vel%>% 
   ggplot(aes(Point,mean.velocity))+
   geom_boxplot()+
@@ -278,7 +280,7 @@ all.mice.theta %>%
 
 * theta tail variance \n
 
-```{r}
+```{r, cache=T}
 all.mice.average.vel %>% 
   ggplot(aes(Group,var.angle.T))+
   geom_boxplot()+
@@ -290,7 +292,7 @@ all.mice.average.vel %>%
 
 * madien Y \n
 
-```{r}
+```{r, cache=T}
 all.mice.average.vel%>% 
   ggplot(aes(Point,madY))+
   geom_boxplot()+
@@ -304,7 +306,7 @@ all.mice.average.vel%>%
 
 * velocity \n
 
-```{r}
+```{r, cache=T}
 all.mice.segment.vel %>% 
   # filter(Group=='WTUT')%>%  
   ggplot(aes(Point,vel))+
@@ -314,7 +316,8 @@ all.mice.segment.vel %>%
   facet_wrap(~Group)+
 NULL
 
-all.vel.summary %>%filter(Point=='Centre') %>%  ggplot(aes(vel))+
+all.mice.segment.vel %>%filter(Point=='Centre') %>%  
+  ggplot(aes(vel))+
   geom_histogram()+
   facet_wrap(~Group)+
   xlim(NA,3000)+
@@ -322,25 +325,356 @@ all.vel.summary %>%filter(Point=='Centre') %>%  ggplot(aes(vel))+
   NULL
 ```
 
-* insight :
-i. theta (centre/tail) in group are similar
+* insights :
+i. dynamic capture from madY and vel
 ii. theta (centre/tail) within group: 
     the range of WTUT is narrow, while the range of NPCTG is wide 
 
 ## 2. Time series analysis 
-###
+### Data explory
+#### 1. X,Y 
+```{r, cache=T}
+library(xts)
+library(zoo)
+p <- all.mice.theta %>% filter(ID.RUN=='WTUT292.2eRUN1',Point=='Centre') %>% ggplot(aes(x=X,y=Y))+
+  geom_line()+
+  ggtitle('WTUT292.2eRUN1')+
+  theme_bw()+
+  transition_reveal(t)+
+  NULL
+animate(p,renderer = gifski_renderer())
+
+WTUT292.2eRUN1.xts <- all.mice.theta %>% filter(ID.RUN=='WTUT292.2eRUN1',Point=='Centre') %>% select(t,X,Y,theta.C,theta.T)
+options(digits.sec=4)
+WTUT292.2eRUN1.xts$t <- seq.POSIXt(from=as.POSIXct('1970-01-01 00:00:00'),by = 0.01,length.out = length(WTUT292.2eRUN1.xts$t))
+head(WTUT292.2eRUN1.xts)
+WTUT292.2eRUN1.xts <- xts(x=WTUT292.2eRUN1.xts[,2:5],order.by=WTUT292.2eRUN1.xts$t)
+plot.zoo(WTUT292.2eRUN1.xts)
+
+```
+
+* in each group 
+```{r, cache=T}
+library(gridExtra)
+a <- all.mice.theta %>% filter(Group=='WTUT',Point=='Centre') %>% 
+  ggplot(aes(x=t,y=X,col=ID.RUN))+
+  geom_line()+
+  ggtitle('WTUT')+
+  scale_x_continuous(breaks = seq(0, 5, 1)) +
+  coord_cartesian(ylim = c(-300, 300),xlim=c(0,5)) +
+  theme(legend.position = "none")+
+  NULL
+b <- all.mice.theta %>% filter(Group=='NPCTG',Point=='Centre')  %>% 
+  ggplot(aes(x=t,y=X,col=ID.RUN))+
+  geom_line()+
+  scale_x_continuous(breaks = seq(0, 5, 1)) +
+  coord_cartesian(ylim = c(-300, 300),xlim=c(0,5)) +
+  ggtitle('NPCTG')+
+  theme(legend.position = "none")+
+  NULL
+c <- all.mice.theta %>% filter(Group=='NPCUT',Point=='Centre')  %>% 
+  ggplot(aes(x=t,y=X,col=ID.RUN))+
+  geom_line()+
+  scale_x_continuous(breaks = seq(0, 5, 1)) +
+  coord_cartesian(ylim = c(-300, 300),xlim=c(0,5)) +
+  ggtitle('NPCUT')+
+  theme(legend.position = "none")+
+  NULL
+grid.arrange(a,b,c,nrow=1)
+
+```
+
+
+```{r, cache=T}
+a <- all.mice.theta %>% filter(Group=='WTUT',Point=='Centre') %>% 
+  ggplot(aes(x=t,y=Y,col=ID.RUN))+
+  geom_line()+
+  ggtitle('WTUT')+
+  scale_x_continuous(breaks = seq(0, 5, 1)) +
+  coord_cartesian(ylim = c(-25, 30),xlim = c(0,5)) +
+  theme(legend.position = "none")+
+  NULL
+b <- all.mice.theta %>% filter(Group=='NPCTG',Point=='Centre')  %>% 
+  ggplot(aes(x=t,y=Y,col=ID.RUN))+
+  geom_line()+
+  scale_x_continuous(breaks = seq(0, 5, 1)) +
+  coord_cartesian(ylim = c(-25, 30),xlim = c(0,5)) +
+  ggtitle('NPCTG')+
+  theme(legend.position = "none")+
+  NULL
+c <- all.mice.theta %>% filter(Group=='NPCUT',Point=='Centre')  %>% 
+  ggplot(aes(x=t,y=Y,col=ID.RUN))+
+  geom_line()+
+  scale_x_continuous(breaks = seq(0, 5, 1)) +
+  coord_cartesian(ylim = c(-25, 30),xlim = c(0,5)) +
+  ggtitle('NPCUT')+
+  theme(legend.position = "none")+
+  NULL
+grid.arrange(a,b,c,nrow=1)
+```
+
+
+```{r, cache=T}
+a <- all.mice.theta %>% filter(Group=='WTUT',Point=='Centre') %>% 
+  ggplot(aes(x=t,y=theta.T,col=ID.RUN))+
+  geom_line()+
+  ggtitle('WTUT')+
+  scale_x_continuous(breaks = seq(0, 5, 1)) +
+  coord_cartesian(ylim = c(-0.7,0.7),xlim = c(0,5)) +
+  theme(legend.position = "none")+
+  NULL
+b <- all.mice.theta %>% filter(Group=='NPCTG',Point=='Centre')  %>% 
+  ggplot(aes(x=t,y=theta.T,col=ID.RUN))+
+  geom_line()+
+  scale_x_continuous(breaks = seq(0, 5, 1)) +
+  coord_cartesian(ylim = c(-0.7,0.7),xlim = c(0,5)) +
+  ggtitle('NPCTG')+
+  theme(legend.position = "none")+
+  NULL
+c <- all.mice.theta %>% filter(Group=='NPCUT',Point=='Centre')  %>% 
+  ggplot(aes(x=t,y=theta.T,col=ID.RUN))+
+  geom_line()+
+  scale_x_continuous(breaks = seq(0, 5, 1)) +
+  coord_cartesian(ylim = c(-0.7,0.7),xlim = c(0,5)) +
+  ggtitle('NPCUT')+
+  theme(legend.position = "none")+
+  NULL
+grid.arrange(a,b,c,nrow=1)
+```
+
+
+```{r, cache=T}
+a <- all.mice.theta %>% filter(Group=='WTUT',Point=='Centre') %>% 
+  ggplot(aes(x=t,y=theta.C,col=ID.RUN))+
+  geom_line()+
+  ggtitle('WTUT')+
+  scale_x_continuous(breaks = seq(0, 5, 1)) +
+  coord_cartesian(ylim = c(-0.7,0.7),xlim = c(0,5)) +
+  theme(legend.position = "none")+
+  NULL
+b <- all.mice.theta %>% filter(Group=='NPCTG',Point=='Centre')  %>% 
+  ggplot(aes(x=t,y=theta.C,col=ID.RUN))+
+  geom_line()+
+  scale_x_continuous(breaks = seq(0, 5, 1)) +
+  coord_cartesian(ylim = c(-0.7,0.7),xlim = c(0,5)) +
+  ggtitle('NPCTG')+
+  theme(legend.position = "none")+
+  NULL
+c <- all.mice.theta %>% filter(Group=='NPCUT',Point=='Centre')  %>% 
+  ggplot(aes(x=t,y=theta.C,col=ID.RUN))+
+  geom_line()+
+  scale_x_continuous(breaks = seq(0, 5, 1)) +
+  coord_cartesian(ylim = c(-0.7,0.7),xlim = c(0,5)) +
+  ggtitle('NPCUT')+
+  theme(legend.position = "none")+
+  NULL
+grid.arrange(a,b,c,nrow=1)
+```
+
+```{r, cache=T}
+a <- all.mice.theta %>% filter(ID=='WTUT292.2e',Point=='Head',Run %in% c('RUN1','RUN2','RUN3')) %>% 
+  ggplot(aes(x=t,y=Y,col=Run))+
+  geom_line()+
+  ggtitle('WTUT292.2e-Y')+
+  scale_x_continuous(breaks = seq(0, 5, 1)) +
+  coord_cartesian(ylim = c(-30,30),xlim = c(0,3)) +
+  theme(legend.position = "none")+
+  NULL
+b <- all.mice.theta %>% filter(ID=='WTUT292.2e',Point=='Head',Run %in% c('RUN1','RUN2','RUN3')) %>% 
+  ggplot(aes(x=t,y=theta.C,col=Run))+
+  geom_line()+
+  ggtitle('WTUT292.2e-theta.C')+
+  scale_x_continuous(breaks = seq(0, 5, 1)) +
+  coord_cartesian(ylim = c(-0.5,0.5),xlim = c(0,3)) +
+  theme(legend.position = "none")+
+  NULL
+c <- all.mice.theta %>% filter(ID=='WTUT292.2e',Point=='Head',Run %in% c('RUN1','RUN2','RUN3')) %>% 
+  ggplot(aes(x=t,y=theta.T,col=Run))+
+  geom_line()+
+  ggtitle('WTUT292.2e-theta.T')+
+  scale_x_continuous(breaks = seq(0, 5, 1)) +
+  coord_cartesian(ylim = c(-0.5,0.5),xlim = c(0,3)) +
+  theme(legend.position = "none")+
+  NULL
+grid.arrange(a,b,c,nrow=1)
+```
+
 ```{r}
+library(gridExtra)
+a <- all.mice.theta %>% 
+  filter(ID=='NPCUT293.2c',Point=='Head',Run %in% c('RUN3','RUN7','RUN11')) %>% 
+  ggplot(aes(x=t,y=Y,col=Run))+
+  geom_line()+
+  ggtitle('NPCUT293.2c-Y')+
+  scale_x_continuous(breaks = seq(0, 5, 1)) +
+  coord_cartesian(ylim = c(-30,30),xlim = c(0,3)) +
+  theme(legend.position = "none")+
+  NULL
+b <- all.mice.theta %>% 
+  filter(ID=='NPCUT293.2c',Point=='Head',Run %in% c('RUN3','RUN7','RUN11')) %>% 
+  ggplot(aes(x=t,y=theta.C,col=Run))+
+  geom_line()+
+  ggtitle('NPCUT293.2c-theta.C')+
+  scale_x_continuous(breaks = seq(0, 5, 1)) +
+  coord_cartesian(ylim = c(-0.5,0.5),xlim = c(0,3)) +
+  theme(legend.position = "none")+
+  NULL
+c <- all.mice.theta %>% filter(ID=='NPCUT293.2c',Point=='Head',Run %in% c('RUN3','RUN7','RUN11')) %>% 
+  ggplot(aes(x=t,y=theta.T,col=Run))+
+  geom_line()+
+  ggtitle('NPCUT293.2c-theta.T')+
+  scale_x_continuous(breaks = seq(0, 5, 1)) +
+  coord_cartesian(ylim = c(-0.5,0.5),xlim = c(0,3)) +
+  theme(legend.position = "none")+
+  NULL
+grid.arrange(a,b,c,nrow=1)
+
+```
+
+```{r}
+a <- all.mice.theta %>% filter(ID=='NPCTG294.2c',Point=='Head',Run %in% c('RUN1','RUN2','RUN3')) %>% 
+  ggplot(aes(x=t,y=Y,col=Run))+
+  geom_line()+
+  ggtitle('NPCTG294.2c-Y')+
+  scale_x_continuous(breaks = seq(0, 5, 1)) +
+  coord_cartesian(ylim = c(-30,30),xlim = c(0,3)) +
+  theme(legend.position = "none")+
+  NULL
+b <- all.mice.theta %>% filter(ID=='NPCTG294.2c',Point=='Head',Run %in% c('RUN1','RUN2','RUN3')) %>% 
+  ggplot(aes(x=t,y=theta.C,col=Run))+
+  geom_line()+
+  ggtitle('NPCTG294.2c-theta.C')+
+  scale_x_continuous(breaks = seq(0, 5, 1)) +
+  coord_cartesian(ylim = c(-0.5,0.5),xlim = c(0,3)) +
+  theme(legend.position = "none")+
+  NULL
+c <- all.mice.theta %>% filter(ID=='NPCTG294.2c',Point=='Head',Run %in% c('RUN1','RUN2','RUN3')) %>% 
+  ggplot(aes(x=t,y=theta.T,col=Run))+
+  geom_line()+
+  ggtitle('NPCTG294.2c-theta.T')+
+  scale_x_continuous(breaks = seq(0, 5, 1)) +
+  coord_cartesian(ylim = c(-0.5,0.5),xlim = c(0,3)) +
+  theme(legend.position = "none")+
+  NULL
+grid.arrange(a,b,c,nrow=1)
+```
+
+* WTUT VS NPCTF VS NPCUT
+
+```{r}
+library(xts)
+WTUT292.2eRUN1.xts <- all.mice.theta %>% filter(ID.RUN=='WTUT292.2eRUN1',Point=='Centre') %>% select(t,X,Y,theta.C,theta.T)
+options(digits.sec=4)
+WTUT292.2eRUN1.xts$t <- seq.POSIXt(from=as.POSIXct('1970-01-01 00:00:00'),by = 0.01,length.out = length(WTUT292.2eRUN1.xts$t))
+# head(WTUT292.2eRUN1.xts)
+WTUT292.2eRUN1.xts <- xts(x=WTUT292.2eRUN1.xts[,2:5],order.by=WTUT292.2eRUN1.xts$t)
+attr(WTUT292.2eRUN1.xts,'frequency') <-60
+# frequency(WTUT292.2eRUN1.xts)
+
+NPCTG286.1gRUN1.xts <- all.mice.theta %>% filter(ID.RUN=='NPCTG286.1gRUN1',Point=='Centre') %>% select(t,X,Y,theta.C,theta.T)
+options(digits.sec=4)
+NPCTG286.1gRUN1.xts$t <- seq.POSIXt(from=as.POSIXct('1970-01-01 00:00:00'),by = 0.01,length.out = length(NPCTG286.1gRUN1.xts$t))
+# head(WTUT292.2eRUN1.xts)
+NPCTG286.1gRUN1.xts <- xts(x=NPCTG286.1gRUN1.xts[,2:5],order.by=NPCTG286.1gRUN1.xts$t)
+attr(NPCTG286.1gRUN1.xts,'frequency') <-60
+
+
+NPCUT293.2cRUN11.xts <- all.mice.theta %>% filter(ID.RUN=='NPCUT293.2cRUN11',Point=='Centre') %>% select(t,X,Y,theta.C,theta.T)
+options(digits.sec=4)
+NPCUT293.2cRUN11.xts$t <- seq.POSIXt(from=as.POSIXct('1970-01-01 00:00:00'),by = 0.01,length.out = length(NPCUT293.2cRUN11.xts$t))
+# head(WTUT292.2eRUN1.xts)
+NPCUT293.2cRUN11.xts <- xts(x=NPCUT293.2cRUN11.xts[,2:5],order.by=NPCUT293.2cRUN11.xts$t)
+attr(NPCUT293.2cRUN11.xts,'frequency') <-60
+
+
+
+
+all.xts <- merge.xts(WTUT=WTUT292.2eRUN1.xts,
+                     NPCTG=NPCTG286.1gRUN1.xts,
+                     NPCUT=NPCUT293.2cRUN11.xts,
+                     all=c(TRUE,TRUE,TRUE))
+
+plot.zoo(all.xts,plot.type = 'multiple',nc=3)
 
 ```
 
 
 
+```{r}
+
+paste0('WTUT-Y')
+plot(decompose(as.ts(WTUT292.2eRUN1.xts$Y)))
+paste0('NPCTG-Y')
+plot(decompose(as.ts(NPCTG286.1gRUN1.xts$Y)))
+paste0('NPCUT-Y')
+plot(decompose(as.ts(NPCUT293.2cRUN11.xts$Y)))
+
+```
+
+*ARIMA model
+
+```{r}
+par(mfrow=c(1,2))
+acf(as.ts(WTUT292.2eRUN1.xts$Y))
+pacf(as.ts(WTUT292.2eRUN1.xts$Y))
+
+wtut.md <- auto.arima(as.ts(WTUT292.2eRUN1.xts$Y))
+wtut.md
+
+checkresiduals(wtut.md)
+wtut.md.sim <- arima.sim(model = list(order=c(0,1,2),ma=c(-0.083,0.4)),n=500) 
+plot(wtut.md.sim)
+
+```
+
+
+```{r}
+par(mfrow=c(1,2))
+acf(as.ts(NPCUT293.2cRUN11.xts$Y))
+pacf(as.ts(NPCUT293.2cRUN11.xts$Y))
+
+NPCUT.md <- auto.arima(as.ts(NPCUT293.2cRUN11.xts$Y))
+NPCUT.md
+
+checkresiduals(NPCUT.md)
+NPCUT.md.sim <- arima.sim(model = list(order=c(1,1,1),ar=0.66,ma=-0.4),n=500) 
+plot(NPCUT.md.sim)
+```
+
+* Models testing
+
+```{r}
+WTUT292.2eRUN2.ts <- all.mice.theta %>% filter(ID.RUN=='WTUT292.2eRUN2',Point=='Centre') %>% select(t,Y)
+options(digits.sec=4)
+WTUT292.2eRUN2.ts <- as.ts(x=WTUT292.2eRUN2.ts[,2],order.by=WTUT292.2eRUN2.ts$t)
+
+
+NPCUT293.2cRUN7.ts <- all.mice.theta %>% filter(ID.RUN=='NPCUT293.2cRUN7',Point=='Centre') %>% select(t,Y)
+options(digits.sec=4)
+NPCUT293.2cRUN7.ts<- as.ts(x=NPCUT293.2cRUN7.ts[,2],order.by=NPCUT293.2cRUN7.ts$t)
+
+
+paste0('wtut.md')
+wtut.md <- auto.arima(as.ts(WTUT292.2eRUN1.xts$Y))
+fc.wtut.md.wt <- forecast(wtut.md,h=length(WTUT292.2eRUN2.ts))
+fc.wtut.md.npc <- forecast(wtut.md,h=length(NPCUT293.2cRUN7.ts))
+fc.wtut.tg <- forecast(wtut.md,h=length(NPCTG286.1gRUN1.xts$Y))
+knitr::kable(accuracy(fc.wtut.md.wt,WTUT292.2eRUN2.ts))
+knitr::kable(accuracy(fc.wtut.md.npc,NPCUT293.2cRUN7.ts))
+knitr::kable(accuracy(fc.wtut.tg,as.ts(NPCTG286.1gRUN1.xts$Y)))
+
+paste0('npc.md')
+NPCUT.md <- auto.arima(as.ts(NPCUT293.2cRUN11.xts$Y))
+fc.npc.md.wt <- forecast(NPCUT.md,h=length(WTUT292.2eRUN2.ts))
+fc.npc.md.npc <- forecast(NPCUT.md,h=length(NPCUT293.2cRUN7.ts))
+fc.npc.tg <- forecast(NPCUT.md,h=length(NPCTG286.1gRUN1.xts$Y))
+knitr::kable(accuracy(fc.npc.md.wt,WTUT292.2eRUN2.ts))
+knitr::kable(accuracy(fc.npc.md.npc,NPCUT293.2cRUN7.ts))
+knitr::kable(accuracy(fc.npc.tg,as.ts(NPCTG286.1gRUN1.xts$Y)))
 
 
 
-
-
-
+```
 
 
 

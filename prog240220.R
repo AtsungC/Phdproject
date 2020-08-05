@@ -507,3 +507,26 @@ mod1.lme = lme( log(mean.velocity) ~ Group, random=~1, data=Summary.all.mice)
 
 summary( mod1.lme)
 
+library(rgl)#plot3d() be able to rotate in real-time
+
+
+f <- function(x) x^4-2*x^2+3
+plot(f,xlim = c(-1.5,1.5))
+library(Deriv)
+f.prime <- Deriv(f)
+f.p.p <- Deriv(f.prime)
+f.p.p
+critical.p.1 <- uniroot(f.prime,interval = c(-1.5,-0.5))$root
+critical.p.2 <- uniroot(f.prime,interval = c(-0.5,0.5))$root
+critical.p.1 <- uniroot(f.prime,interval = c(0.5,1.5))$root
+
+plot(f,xlim = c(-1.5,1.5),ylim=c(-2,5),col='red')
+curve(f.prime,xlim = c(-1.5,1.5),col='blue',add = TRUE)
+abline(h=0,lty=3)
+
+
+
+
+plot(f.p.p,xlim = c(-1.5,1.5),col='green')
+
+

@@ -22,3 +22,7 @@ TeachingDemos
 plotmo
 lattice
 caret
+zoo
+xts
+gridExtra
+forecast
