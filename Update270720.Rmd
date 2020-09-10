@@ -499,7 +499,7 @@ c <- all.mice.theta %>% filter(ID=='WTUT292.2e',Point=='Head',Run %in% c('RUN1',
 grid.arrange(a,b,c,nrow=1)
 ```
 
-```{r}
+```{r,cache=T}
 library(gridExtra)
 a <- all.mice.theta %>% 
   filter(ID=='NPCUT293.2c',Point=='Head',Run %in% c('RUN3','RUN7','RUN11')) %>% 
@@ -531,7 +531,7 @@ grid.arrange(a,b,c,nrow=1)
 
 ```
 
-```{r}
+```{r,cache=T}
 a <- all.mice.theta %>% filter(ID=='NPCTG294.2c',Point=='Head',Run %in% c('RUN1','RUN2','RUN3')) %>% 
   ggplot(aes(x=t,y=Y,col=Run))+
   geom_line()+
@@ -561,7 +561,7 @@ grid.arrange(a,b,c,nrow=1)
 
 * WTUT VS NPCTF VS NPCUT
 
-```{r}
+```{r,cache=T}
 library(xts)
 WTUT292.2eRUN1.xts <- all.mice.theta %>% filter(ID.RUN=='WTUT292.2eRUN1',Point=='Centre') %>% select(t,X,Y,theta.C,theta.T)
 options(digits.sec=4)
@@ -600,7 +600,7 @@ plot.zoo(all.xts,plot.type = 'multiple',nc=3)
 
 
 
-```{r}
+```{r,cache=T}
 
 paste0('WTUT-Y')
 plot(decompose(as.ts(WTUT292.2eRUN1.xts$Y)))
@@ -613,7 +613,7 @@ plot(decompose(as.ts(NPCUT293.2cRUN11.xts$Y)))
 
 *ARIMA model
 
-```{r}
+```{r,cache=T}
 par(mfrow=c(1,2))
 acf(as.ts(WTUT292.2eRUN1.xts$Y))
 pacf(as.ts(WTUT292.2eRUN1.xts$Y))
@@ -628,7 +628,7 @@ plot(wtut.md.sim)
 ```
 
 
-```{r}
+```{r,cache=T}
 par(mfrow=c(1,2))
 acf(as.ts(NPCUT293.2cRUN11.xts$Y))
 pacf(as.ts(NPCUT293.2cRUN11.xts$Y))
@@ -643,7 +643,7 @@ plot(NPCUT.md.sim)
 
 * Models testing
 
-```{r}
+```{r,cache=T}
 WTUT292.2eRUN2.ts <- all.mice.theta %>% filter(ID.RUN=='WTUT292.2eRUN2',Point=='Centre') %>% select(t,Y)
 options(digits.sec=4)
 WTUT292.2eRUN2.ts <- as.ts(x=WTUT292.2eRUN2.ts[,2],order.by=WTUT292.2eRUN2.ts$t)
@@ -676,5 +676,76 @@ knitr::kable(accuracy(fc.npc.tg,as.ts(NPCTG286.1gRUN1.xts$Y)))
 
 ```
 
+# Spectral analysis
 
+```{r,cache=T}
+# create all ID.RUN xts data
+for ( i in 1:length(unique(all.mice.theta$ID.RUN))) {
+  df0 <- all.mice.theta %>% filter(ID.RUN==unique(all.mice.theta$ID.RUN)[i],Point=='Centre') %>% select(t,X,Y,theta.C,theta.T)
+  options(digits.sec=4)
+  df0$t <- seq.POSIXt(from=as.POSIXct('1970-01-01 00:00:00'),by = 0.01,length.out = length(df0$t))
+  print(unique(all.mice.theta$ID.RUN)[i])
+  df0 <- xts(x=df0[,2:5],order.by=df0$t)
+  attr(df0,'frequency') <- 60
+  assign(unique(all.mice.theta$ID.RUN)[i],df0)
+}
+wt.id <- na.omit(unique(str_extract(all.mice$ID.RUN,'WTUT[0-9]{3}\\.[0-9][a-z]RUN[0-9]+')))
+npc.id <- na.omit(unique(str_extract(all.mice$ID.RUN,'NPCUT[0-9]{3}\\.[0-9][a-z]RUN[0-9]+')))
+npctg.id <- na.omit(unique(str_extract(all.mice$ID.RUN,'NPCTG[0-9]{3}\\.[0-9][a-z]RUN[0-9]+')))
+
+```
+
+* spectral analysis for WTUT
+
+# ```{r}
+# par(mfrow=c(5,3))
+# for (i in 1:length(wt.id)) {
+# #print(i)
+#  xts <- get(wt.id[i])
+#  ts <- as.ts(xts$Y)
+#  sp <- spectrum(ts,plot=F)
+#  # options("scipen"=100, "digits"=4)
+#  SPEC <- as.numeric(sp$spec)
+#  FREQ <- as.numeric(sp$freq)
+#  plot(FREQ,SPEC,type = 'l',ylim = c(0,5))
+#  # id <- as.character(wt.id[i])
+#  # df0 <- cbind(SPEC,FREQ,id)
+#  # df1 <- rbind(df1,df0)
+# }
+```
+
+* spectral analysis for NPCUT
+
+```{r}
+# par(mfrow=c(5,3))
+# for (i in 1:length(npc.id)) {
+#   #print(i)
+#   xts <- get(npc.id[i])
+#   ts <- as.ts(xts$Y)
+#   sp <- spectrum(ts,plot=F)
+#   options("scipen"=100, "digits"=4)
+#   SPEC <- as.numeric(sp$spec)
+#   FREQ <- as.numeric(sp$freq)
+#   plot(FREQ,SPEC,type = 'l',ylim = c(0,5))
+# 
+# }
+```
+
+* spectral analysis for NPCTG
+
+```{r}
+# par(mfrow=c(5,3))
+# for (i in 1:length(npctg.id)) {
+#   #print(i)
+#   xts <- get(npctg.id[i])
+#   ts <- as.ts(xts$Y)
+#   sp <- spectrum(ts,plot=F)
+#   options("scipen"=100, "digits"=4)
+#   SPEC <- as.numeric(sp$spec)
+#   FREQ <- as.numeric(sp$freq)
+#   plot(FREQ,SPEC,type = 'l',ylim = c(0,5))
+#   
+# }
+
+```
 

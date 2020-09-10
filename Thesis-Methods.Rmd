@@ -1,0 +1,42 @@
+---
+title: "R Notebook"
+output: html_notebook
+---
+# Animal behavioural Assessments
+## introduction
+## Laboratoy Methods
+## Statistical Methods
+### Convolutional neural networks (CNNS) for Coordination data 
+Gait videos were retrieved from the Catwalk system, and three points on the mouse annotated, nose, centre of the body and base of the tail. Using convolutional neural networks (CNNs) for image recognition and mark the coordination of three points of a animal models from videos. The transfer learning is applied to accelerate the learning process and incres the accuracy of coordinations.  
+
+### Features engineering : Rotatiing angle
+The definition of rotating angle is the angle between horizontal line and a line from root of tail to nose. The coordinations from CNNs results are calculated to generate this variable, which is independent to sensetivity of paw signals. The paw signals are affected largely by individual's weight. To calulate the angle, we apply trigonometric functions from the horizontal veacter ,$\vec{a}$, and the vector from base of the tail to the nose,$\vec{b}$. The fomula is following : 
+
+$$\vec{a}\cdot\vec{b}=\left\lvert{\vec{a}}\right\rvert\left\lvert{\vec{b}}\right\rvert cos \theta$$
+
+
+
+
+
+
+### Software
+##### Packages 
+##### data preparation 
+ • tidyverse :
+ • dplyr : 
+ • readxl :
+ • ciruclar :
+ • lubricate : 
+##### time series 
+ • xts :
+ • xoo : 
+##### data presentation
+ • ggplot2 :
+ • gganimate :
+ • plotly :
+ • rpart.plot :
+ • gridExtra : 
+##### machine learning algorithms
+ • h2o :
+ • tree : 
+ 

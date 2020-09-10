@@ -70,7 +70,7 @@ all.mice <- all.mice %>% rename(c('ID.RUN'='ID'))
 all.mice <- all.mice %>% 
   mutate(
     Run= str_extract(all.mice$ID.RUN,'RUN[0-9]+'),
-    ID= str_extract(all.mice$ID.RUN,'[A-Z]{4,5}[0-9]{3}\\.[0-9][a-z]'),
+    ID= str_extract(all.mice$ID.RUN,'[A-Z]{4,5}[0-9]{3}\\.[0-9][a-z]RUN['),
     Group= str_extract(all.mice$ID.RUN,'^[A-Z]+')
   )
 all.mice %>% select(ID,Group,Run,ID.RUN,everything())
@@ -197,7 +197,7 @@ all.mice.theta %>%
   geom_smooth()+
   facet_wrap(~Group)+
   NULL
-
+# time series analysis
 WTUT292.2eRUN1.xts <- all.mice.theta %>% filter(ID.RUN=='WTUT292.2eRUN1',Point=='Centre') %>% select(t,X,Y,theta.C,theta.T)
 options(digits.sec=4)
 WTUT292.2eRUN1.xts$t <- seq.POSIXt(from=as.POSIXct('1970-01-01 00:00:00'),by = 0.01,length.out = length(WTUT292.2eRUN1.xts$t))
@@ -207,13 +207,10 @@ attr(WTUT292.2eRUN1.xts,'frequency') <-60
 frequency(WTUT292.2eRUN1.xts)
 
 
-USgas
-acf(USgas,lag.max = 60)
-
 acf(WTUT292.2eRUN1.xts$Y,lag.max = 60)
 pacf(WTUT292.2eRUN1.xts$Y,lag.max = 60)
 ts_lags(WTUT292.2eRUN1.xts$Y,lags = c(1,24,25,26))
-len
+
 partition <- ts_split(as.ts(WTUT292.2eRUN1.xts$Y),sample.out=(length(WTUT292.2eRUN1.xts$X)*0.2))
 partition.t <- ts_split(as.ts(WTUT292.2eRUN1.xts$theta.T),sample.out=(length(WTUT292.2eRUN1.xts$X)*0.2))
 partition.c <- ts_split(as.ts(WTUT292.2eRUN1.xts$theta.C),sample.out=(length(WTUT292.2eRUN1.xts$X)*0.2))
@@ -255,25 +252,160 @@ h2o.init(max_mem_size = '4G')
 
 
 
+# load all xts data ()
+for ( i in 1:length(unique(all.mice.theta$ID.RUN))) {
+  df0 <- all.mice.theta %>% filter(ID.RUN==unique(all.mice.theta$ID.RUN)[i],Point=='Centre') %>% select(t,X,Y,theta.C,theta.T)
+  options(digits.sec=4)
+  df0$t <- seq.POSIXt(from=as.POSIXct('1970-01-01 00:00:00'),by = 0.01,length.out = length(df0$t))
+  print(unique(all.mice.theta$ID.RUN)[i])
+  df0 <- xts(x=df0[,2:5],order.by=df0$t)
+  attr(df0,'frequency') <- 60
+  assign(unique(all.mice.theta$ID.RUN)[i],df0)
+}
 
-  for ( i in 1:length(unique(all.mice.theta$ID.RUN))) {
-  df0 <- all.mice.theta %>% filter(ID.RUN==unique(all.mice.theta$ID.RUN)[i-1],Point=='Centre') %>% select(t,X,Y,theta.C,theta.T)
-  options(digits.sec=4)
-  df0$t <- seq.POSIXt(from=as.POSIXct('1970-01-01 00:00:00'),by = 0.01,length.out = length(df0$t))
-  print(unique(all.mice.theta$ID.RUN)[i])
-  df0 <- xts(x=df0[,2:5],order.by=df0$t)
-  attr(df0,'frequency') <- 60
-  
-  df1 <- all.mice.theta %>% filter(ID.RUN==unique(all.mice.theta$ID.RUN)[i],Point=='Centre') %>% select(t,X,Y,theta.C,theta.T)
-  options(digits.sec=4)
-  df0$t <- seq.POSIXt(from=as.POSIXct('1970-01-01 00:00:00'),by = 0.01,length.out = length(df0$t))
-  print(unique(all.mice.theta$ID.RUN)[i])
-  df0 <- xts(x=df0[,2:5],order.by=df0$t)
-  attr(df0,'frequency') <- 60
+wt.id <- na.omit(unique(str_extract(all.mice$ID.RUN,'WTUT[0-9]{3}\\.[0-9][a-z]RUN[0-9]+')))
+npc.id <- na.omit(unique(str_extract(all.mice$ID.RUN,'NPCUT[0-9]{3}\\.[0-9][a-z]RUN[0-9]+')))
+npctg.id <- na.omit(unique(str_extract(all.mice$ID.RUN,'NPCTG[0-9]{3}\\.[0-9][a-z]RUN[0-9]+')))
+
+df0 <- data.frame()
+df1 <- data.frame()
+# results <- data.frame()
+par(mfrow=c(3,5))
+for (i in 1:length(wt.id)) {
+print(i)
+ xts <- get(wt.id[i])
+ ts <- as.ts(xts$Y)
+ sp <- spectrum(ts,plot=F) #detrend default
+ # options("scipen"=100, "digits"=4)
+
+ SPEC <- as.numeric(sp$spec)
+ FREQ <- as.numeric(sp$freq)
+
+ plot(FREQ,SPEC,type = 'l',ylim = c(0,10),xlim = c(0,2*pi))
+
+ print(paste0('the max SPEC:',max(SPEC), 'at FREQ:',FREQ[which(SPEC %in% max(SPEC))]))
+ results <- data.frame(max.spec=max(SPEC),
+                       freq=FREQ[which(SPEC %in% max(SPEC))])
+ # print(FREQ[which(SPEC %in% max(SPEC))])
+ # id <- as.character(wt.id[i])
+ # df0 <- cbind(SPEC,FREQ,id)
+ # df1 <- rbind(df1,df0)
+}
+
+# mario 
+par(mfrow=c(3,5))
+results<- matrix(NA, ncol=2, nrow=length(wt.id))### initialise matrix for results
+for (i in 1:length(wt.id)) {
   print(i)
-  # ifelse(i%%2==0,all.xts<- merge.xts(
-    # paste0(unique(all.mice.theta$ID.RUN)[i-1])=df0,
-    # paste0(unique(all.mice.theta$ID.RUN)[i])=df1),next())
+  xts <- get(wt.id[i])
+  ts <- as.ts(xts$Y)
+  sp <- spectrum(ts,plot=F) #detrend default
+  # options("scipen"=100, "digits"=4) 
+  SPEC <- as.numeric(sp$spec)
+  FREQ <- as.numeric(sp$freq) 
+  plot(FREQ,SPEC,type = 'l',ylim = c(0,10),xlim = c(0,2*pi)) 
+  # print(paste0('the max SPEC:',max(SPEC), 'at FREQ:',FREQ[which(SPEC %in% max(SPEC))]))
+  
+  # results[i,] <- data.frame(max.spec=max(SPEC),freq=FREQ[which(SPEC %in% max(SPEC))])
+   results[i,]<- c(max(SPEC),FREQ[which(SPEC %in% max(SPEC))])          
+  # print(FREQ[which(SPEC %in% max(SPEC))])
+  
+  # id <- as.character(wt.id[i])
+  
+  # df0 <- cbind(SPEC,FREQ,id)
+  
+  # df1 <- rbind(df1,df0)
+}
+
+
+results<- as.data.frame(results)
+
+names(results)<- c('max.spec', 'freq.at.max')
+results <- results %>% mutate(group='wtut')
+
+
+
+plot(FREQ[1:100],SPEC[1:100],type = 'l')
+i=1
+xts <- get(wt.id[i])
+ts <- as.ts(xts$Y)
+sp <- spectrum(ts,plot=T)
+i=2
+max.f <- as.vector()
+par(mfrow=c(3,5))
+results.npc<- matrix(NA, ncol=2, nrow=length(npc.id))
+for (i in 1:length(npc.id)) {
+  print(i)
+  xts <- get(npc.id[i])
+  ts <- as.ts(xts$Y)
+  sp <- spectrum(ts,plot=F)
+  # options("scipen"=100, "digits"=4)
+  SPEC <- as.numeric(sp$spec)
+  FREQ <- as.numeric(sp$freq)
+  # plot(FREQ,SPEC,type = 'l',ylim = c(0,10),xlim = c(0,2*pi))
+  # print(paste0('the max SPEC:',max(SPEC), 'at FREQ:',FREQ[which(SPEC %in% max(SPEC))]))
+  results.npc[i,] <- c(max(SPEC),FREQ[which(SPEC %in% max(SPEC))])    
+  # print(FREQ[which(SPEC %in% max(SPEC))])
+  }
+
+results.npc<- as.data.frame(results.npc)
+
+names(results.npc)<- c('max.spec', 'freq.at.max')
+results.npc <- results.npc %>% mutate(group="npc")
+results.npctg<- matrix(NA, ncol=2, nrow=length(npctg.id))
+par(mfrow=c(3,5))
+for (i in 1:length(npctg.id)) {
+  print(i)
+  xts <- get(npctg.id[i])
+  ts <- as.ts(xts$Y)
+  sp <- spectrum(ts,plot=F)
+  # options("scipen"=100, "digits"=4)
+  SPEC <- as.numeric(sp$spec)
+  FREQ <- as.numeric(sp$freq)
+  plot(FREQ,SPEC,type = 'l',ylim = c(0,5))
+  # print(paste0('the max SPEC:',max(SPEC), 'at FREQ:',FREQ[which(SPEC %in% max(SPEC))]))
+  results.npctg[i,] <- c(max(SPEC),FREQ[which(SPEC %in% max(SPEC))])
+}
+results.npctg<- as.data.frame(results.npctg)
+
+names(results.npctg)<- c('max.spec', 'freq.at.max') 
+results.npctg <- results.npctg %>% mutate(group='npctg')
+
+results.all <- rbind(results,results.npc,results.npctg)
+
+results.all %>% ggplot(aes(x=freq.at.max,y=max.spec,color=group))+
+                         geom_point()
+  
+
+
+df1$FREQ <- as.numeric(df1$FREQ)
+df1$id <- as.character(df1$id)
+str(df1)
+df1   %>% 
+  ggplot(aes(x=FREQ,y=SPEC,colour=id))+
+  geom_line()+
+  # scale_x_continuous(breaks = c(5,10,15,20,25,30), limits = c(0,30)) +
+  # scale_y_continuous(breaks = c(0.1,0.2,0.3), limits = c(0,0.4))+
+  theme(legend.position = 'none')
+  
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+for(i in 1:6) { #-- Create objects  'r.1', 'r.2', ... 'r.6' --
+  nam <- paste("r", i, sep = ".")
+  assign(nam, 1:i)
 }
 
 NPCTG286.1gRUN1.xts <- all.mice.theta %>% filter(ID.RUN=='NPCTG286.1gRUN1',Point=='Centre') %>% select(t,X,Y,theta.C,theta.T)
@@ -293,20 +425,7 @@ WTUT292.2eRUN1.xts <- xts(x=WTUT292.2eRUN1.xts[,2:5],order.by=WTUT292.2eRUN1.xts
 attr(WTUT292.2eRUN1.xts,'frequency') <-60
 frequency(WTUT292.2eRUN1.xts)
 
-WTUT292.2eRUN1.xts <- all.mice.theta %>% filter(ID.RUN=='WTUT292.2eRUN1',Point=='Centre') %>% select(t,X,Y,theta.C,theta.T)
-options(digits.sec=4)
-WTUT292.2eRUN1.xts$t <- seq.POSIXt(from=as.POSIXct('1970-01-01 00:00:00'),by = 0.01,length.out = length(WTUT292.2eRUN1.xts$t))
-# head(WTUT292.2eRUN1.xts)
-WTUT292.2eRUN1.xts <- xts(x=WTUT292.2eRUN1.xts[,2:5],order.by=WTUT292.2eRUN1.xts$t)
-attr(WTUT292.2eRUN1.xts,'frequency') <-60
-# frequency(WTUT292.2eRUN1.xts)
 
-NPCTG286.1gRUN1.xts <- all.mice.theta %>% filter(ID.RUN=='NPCTG286.1gRUN1',Point=='Centre') %>% select(t,X,Y,theta.C,theta.T)
-options(digits.sec=4)
-NPCTG286.1gRUN1.xts$t <- seq.POSIXt(from=as.POSIXct('1970-01-01 00:00:00'),by = 0.01,length.out = length(NPCTG286.1gRUN1.xts$t))
-# head(WTUT292.2eRUN1.xts)
-NPCTG286.1gRUN1.xts <- xts(x=NPCTG286.1gRUN1.xts[,2:5],order.by=NPCTG286.1gRUN1.xts$t)
-attr(NPCTG286.1gRUN1.xts,'frequency') <-60
 
 WTUT292.2eRUN2.ts <- all.mice.theta %>% filter(ID.RUN=='WTUT292.2eRUN2',Point=='Centre') %>% select(t,Y)
 options(digits.sec=4)
@@ -331,6 +450,17 @@ NPCUT293.2cRUN3.ts<- as.ts(x=NPCUT293.2cRUN3.ts[,2],order.by=NPCUT293.2cRUN3.ts$
 class(NPCUT293.2cRUN3.ts)
 wtut.md <- auto.arima(NPCUT293.2cRUN3.ts)
 
+par(mfrow=c(3,1))
+NPCUT.sp <- spectrum(NPCUT293.2cRUN3.ts)
+NPCTG.sp <- spectrum(WTUT292.2eRUN2.ts,plot=T)
+WTUT.sp <- spectrum(WTUT292.2eRUN2.ts,plot=T)
+NPCUT.sp$spec
+freq
+
+class(NPCUT.sp)
+summary(NPCUT.sp)
+NPCUT.sp
+grid.arrange(WTUT.sp,NPCUT.sp,NPCTG.sp,nrow=1)
 
 wtut.md <- auto.arima(as.ts(WTUT292.2eRUN1.xts$Y))
 fc.wtut.md.wt <- forecast(wtut.md,h=length(WTUT292.2eRUN2.ts))
@@ -714,13 +844,50 @@ Average.velocity <- function(filename2){
 }
 
 Vel.all.mice <- Average.velocity(all.mice.theta)
-
-
 any(is.na(Vel.all.mice))
 names(Vel.all.mice)
 Vel.all.micez <- drop_na(Vel.all.mice)
 any(is.na(Vel.all.mice))
 Vel.all.mice[which(is.na(Vel.all.mice)),]
+
+################## kmeans 
+
+library(cluster)    # clustering algorithms
+library(factoextra) # clustering algorithms & visualization
+k.vel.mice.c <- Vel.all.mice %>%filter(Point=='Centre',Group!='NPCTG') %>% select(-ID,-Run,-Group,-Point)
+head(k.vel.mice.c)
+df <- Vel.all.mice %>% filter(Point=='Centre',Group!='NPCTG') %>% select(-ID,-Run,-Point)
+head(df)
+k.vel.mice.c <- scale(k.vel.mice.c)
+
+distance <- get_dist(k.vel.mice.c)
+head(distance)
+fviz_dist(distance, gradient = list(low = "#00AFBB", mid = "white", high = "#FC4E07"))
+
+#gap statistic
+set.seed(123)
+gap_stat <- clusGap(k.vel.mice.c, FUN = kmeans, nstart = 25,
+                    K.max = 10, B = 50)
+print(gap_stat, method = "firstmax")
+fviz_gap_stat(gap_stat)
+
+#silhouette method
+fviz_nbclust(k.vel.mice.c, kmeans, method = "silhouette")
+#elbow method
+fviz_nbclust(k.vel.mice.c, kmeans, method = "wss")
+
+k2 <- kmeans(k.vel.mice.c,centers= 2,nstart=25)
+fviz_cluster(k2,data=k.vel.mice.c)
+k3 <- kmeans(k.vel.mice.c,centers= 3,nstart=25)
+fviz_cluster(k3,data=k.vel.mice.c)
+
+require(useful)
+plot(k2,data=df,class='Group')
+plot(k3,data=df,class='Group')
+
+
+
+
 
 
 Vel.all.mice %>% 
